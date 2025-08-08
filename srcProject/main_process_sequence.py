@@ -8,7 +8,7 @@ from srcProject.data_loaders.pdf_dataset import PDFDataset
 from srcProject.models.layout_reader import find_reading_order_index
 from srcProject.models.model_manager import ModelManager
 from srcProject.utlis.aftertreatment import batch_preprocess_detections, normalize_polygons_to_bboxes, poly_to_bbox
-from srcProject.utlis.common import get_key_by_value, find_project_root
+from srcProject.utlis.common import get_key_by_value, find_project_root, prepare_directory
 from srcProject.utlis.visualization.visualize_document import visualize_document
 import os
 
@@ -19,10 +19,8 @@ async def layout_prediction(input_path: str, bool_ocr = True) -> List[List[Dict[
     """
     处理单个文档，执行布局分析、文本提取和结构化，并进行可视化。
     """
-
     file_extension = os.path.splitext(input_path)[1].lower()
     all_page_images = []
-
     if file_extension == '.pdf':
         dataset = PDFDataset(input_path)
         for page_index in range(len(dataset)):
@@ -34,7 +32,6 @@ async def layout_prediction(input_path: str, bool_ocr = True) -> List[List[Dict[
         all_page_images.append({"image": image, "page_size": (int(image.width), int(image.height))})
     else:
         raise ValueError(f"不支持的文件类型: {file_extension}")
-
     print(f"开始对 {len(all_page_images)} 页进行布局预测...")
     detections_per_page = model_manager.layout_detector.batch_predict(
         images=all_page_images,
@@ -110,6 +107,7 @@ def read_prediction(data:List[List[Dict[str, Any]]])->List[List[int]]:
     print(f'阅读顺序索引{order_in_list}')
     return order_in_list
 
+
 def generate_markdown_document(data: List[List[Dict[str, Any]]], reading_order: List[List[int]],
                                output_path: str) -> None:
     """
@@ -119,31 +117,35 @@ def generate_markdown_document(data: List[List[Dict[str, Any]]], reading_order: 
         reading_order: 一个列表，包含了每页元素的阅读顺序索引。
         output_path: 最终Markdown文件的保存路径。
     """
+    # 检查并创建保存路径的父目录
+    save_root_path = os.path.dirname(output_path)
+    images_path = os.path.join(save_root_path, "images")
+    prepare_directory(save_root_path)
+    prepare_directory(images_path)
     markdown_content = []
     # 遍历每个页面的阅读顺序
-    save_root_path = os.path.dirname(output_path)
-    images_path = os.path.join(save_root_path,"images")
-    os.makedirs(save_root_path, exist_ok=True)
-    os.makedirs(images_path, exist_ok=True)
     for page_index, order_list in enumerate(reading_order):
         page_data = data[page_index]
         sorted_data = []
         for index in range(len(page_data)):
             new_index = order_list.index(index)
             sorted_data.append(page_data[new_index])
-        for element in sorted_data :
+        for element in sorted_data:
             category_id = int(element.get('category_id'))
             content = element.get('text', '')
-            category_key_enum = BlockType_MEMBER[category_id]
+            category_key_enum = BlockType_MEMBER.get(category_id)
+            if category_key_enum is None:
+                continue
             # 根据键名拼接内容
             if category_key_enum == BlockType.TITLE:
                 markdown_content.append(f"## {content}\n")
-            elif category_key_enum in [BlockType.PLAIN_TEXT,BlockType.TABLE,BlockType.ISOLATE_FORMULA]:
+            elif category_key_enum in [BlockType.PLAIN_TEXT, BlockType.TABLE, BlockType.ISOLATE_FORMULA]:
                 markdown_content.append(f"{content}\n\n")
             elif category_key_enum in [BlockType.FIGURE_CAPTION, BlockType.TABLE_CAPTION, BlockType.TABLE_FOOTNOTE]:
                 markdown_content.append(f"_{content}_\n\n")
             elif category_key_enum == BlockType.FIGURE:
                 # 生成一个UUID对象
+                import uuid
                 unique_uuid = str(uuid.uuid4())
                 cropped_image = element.get('cropped_image')
                 if cropped_image is not None and isinstance(cropped_image, Image.Image):
@@ -155,11 +157,11 @@ def generate_markdown_document(data: List[List[Dict[str, Any]]], reading_order: 
     final_markdown = "".join(markdown_content)
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(final_markdown)
-
     print(f"Markdown文档已生成并保存到: {output_path}")
+
 if __name__ == '__main__':
-    sample_path = os.path.join(find_project_root(), 'tests/test_data/demo1.pdf')
-    sample_path = os.path.join(find_project_root(), 'tests/test_data/Snipaste_2025-08-08_15-16-39.png')
+    sample_path = os.path.join(find_project_root(), 'tests/test_data/Realization of superhuman intelligence in microstrip filter design based on clustering-reinforcement learning.pdf')
+    # sample_path = os.path.join(find_project_root(), 'tests/test_data/Snipaste_2025-08-08_15-16-39.png')
     # sample_path = r"F:\ysh_loc_office\ysgz\doc-pdf\0730_docx\xx.pdf"
     file_name_without_extension, file_extension = os.path.splitext(os.path.basename(sample_path))
     detections = asyncio.run(layout_prediction(sample_path, bool_ocr=True))

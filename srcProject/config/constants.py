@@ -1,10 +1,8 @@
 # src/config/constants.py
 from enum import Enum
-
 LAYOUT_SETTING_IMGSIZE = 1280
 LAYOUT_SETTING_CONF = 0.3
 LAYOUT_SETTING_IOU = 0.1
-
 # --- 核心枚举：单一数据源 ---
 class BlockType(Enum):
     TITLE = 0
@@ -70,8 +68,7 @@ DEFAULT_COLORS = {
 DEFAULT_COLOR_UNKNOWN = (200, 200, 200)
 
 # --- 指令映射 ---
-latex_expression = "For non-formula content: Please recognize and output the text directly.For content containing formulas: Standard LaTeX notation must be used and formatting accuracy must be ensured Only supports MathJax/KaTeX rendering environment.LaTeX formula output: All LaTeX formulas must be enclosed within $ ."
-# 使用 BlockType 枚举作为键
+latex_expression = "When handling non-formula content, please identify and output the text directly, without using formula editing symbols like `$` or `\mathrm`. For content containing formulas, you must use standard LaTeX notation and ensure formatting accuracy. You need to separate the mathematical formulas from the text. The formula part should be enclosed in `$···$' (only including mathematical symbols and expressions). The text part should be written as a regular paragraph. Please note that the current output only supports the MathJax/KaTeX rendering environment.# 使用 BlockType 枚举作为键"
 INSTRUCTION = {
     BlockType.TITLE: "Please output the text content from the image.",
     BlockType.PLAIN_TEXT: f"Please output the text content from the image. {latex_expression}",
@@ -79,5 +76,5 @@ INSTRUCTION = {
     BlockType.TABLE: f"This image may be a table, if it is a table, please output the table in markdown format. {latex_expression}",
     BlockType.TABLE_CAPTION: f"Please output the text content from the image. {latex_expression}",
     BlockType.TABLE_FOOTNOTE: f"Please output the text content from the image. {latex_expression}",
-    BlockType.ISOLATE_FORMULA:"Please transcribe the expression from the image into LaTeX format. Please ensure the LaTeX code is accurate and compatible with MathJax/KaTeX rendering environments. The final LaTeX formula should be enclosed within $$."
+    BlockType.ISOLATE_FORMULA:"Please transcribe the expression from the image into LaTeX format. You must use standard LaTeX notation and ensure formatting accuracy. The formula part should be enclosed in `$$···$$'(eg. including mathematical symbols and expressions). Please note that the current output only supports the MathJax/KaTeX rendering environment."
 }

@@ -10,7 +10,7 @@ Responsible for:
 from typing import List, Any, Dict
 from PIL import Image
 from srcProject.config.settings import LAYOUT_MODEL_NAME, LAYOUT_WEIGHTS_PATH, READ_MODEL_NAME, READ_WEIGHTS_PATH, \
-    FLOW_API_NAME, FLOW_API_KEY, FLOW_URL
+    FLOW_API_NAME, FLOW_API_KEY, FLOW_URL, DEVICE
 from srcProject.models.layout_detector import DocLayoutYOLO
 from srcProject.models.layout_reader import LayoutReader
 from srcProject.models.model_base import BaseModel
@@ -37,7 +37,7 @@ class ModelFactory:
 
 
 class ModelManager:
-    def __init__(self,device: str = 'cuda'):
+    def __init__(self,device: str = DEVICE):
         self.device = device
         print(f"使用{self.device}加载了模型")
         # 使用工厂创建布局检测器实例

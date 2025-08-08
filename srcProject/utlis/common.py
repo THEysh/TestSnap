@@ -1,5 +1,5 @@
 from pathlib import Path
-
+import os
 
 def find_project_root(marker_file: str = 'requirements.txt') -> Path:
     """
@@ -34,3 +34,22 @@ def get_key_by_value(dictionary, value):
         if val == value:
             return key
     return None
+
+def prepare_directory(path):
+    """
+    检查文件夹是否存在。如果存在，return；如果不存在，则创建。
+
+    Args:
+        path (str): 要处理的文件夹路径。
+    """
+    # 检查路径是否存在，并且是否是一个文件
+    if os.path.exists(path) and os.path.isfile(path):
+        raise ValueError(f"提供的路径 '{path}' 是一个文件，而不是文件夹。请提供一个文件夹路径。")
+    if os.path.exists(path):
+        # 文件夹存在
+        return
+    else:
+        # 文件夹不存在，创建它
+        print(f"文件夹 '{path}' 不存在，正在创建...")
+        os.makedirs(path)
+        print(f"文件夹 '{path}' 已创建。")

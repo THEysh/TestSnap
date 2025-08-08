@@ -1,10 +1,6 @@
 # config.yaml
 # 设备配置
 device: cuda # 可选: cuda / cpu / mps
-
-# 模型配置目录（如果你的权重路径是相对于这个目录的，可以保留）
-
-# 布局模型配置列表
 layout_weights_config:
   # DocLayout YOLO 模型配置
   layout_model:
