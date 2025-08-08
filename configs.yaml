@@ -1,0 +1,24 @@
+# config.yaml
+# 设备配置
+device: cuda # 可选: cuda / cpu / mps
+
+# 模型配置目录（如果你的权重路径是相对于这个目录的，可以保留）
+
+# 布局模型配置列表
+layout_weights_config:
+  # DocLayout YOLO 模型配置
+  layout_model:
+    name: doclayout_yolo # 这个名称将用于 LayoutDetectorFactory
+    path: data/models/structure/doclayout_yolo_docstructbench_imgsz1280_2501.pt # 这是一个相对路径，相对于 models_dir
+
+read_weights_config:
+  read_model:
+    name: LayoutLMv3
+    path: data/models/Relation
+
+gpt-api:
+  api_key: sk-cxropeqeyqablbtbltjfqezajpziohsnlomwfuqecqnrtzxo
+  api_name: Siliconflow
+  base_url: https://api.siliconflow.cn/v1
+#  model_name: deepseek-ai/deepseek-vl2
+  model_name: Pro/Qwen/Qwen2.5-VL-7B-Instruct
