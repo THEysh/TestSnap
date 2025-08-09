@@ -20,7 +20,6 @@ if __name__ == '__main__':
     ]
     # model_dir = model_file_download(model_id='Qwen/QwQ-32B-GGUF', file_path='qwq-32b-q4_k_m.gguf')
     # 检查所有文件是否都已存在
-
     for i in range(len(files_to_check)):
         if os.path.exists(files_to_check[i]):
             continue
