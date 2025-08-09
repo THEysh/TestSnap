@@ -46,23 +46,20 @@ TextSnap 是一个功能强大的文档智能处理系统，专注于将非结�
    ```bash
    python scripts/download_models.py
    ```
-5.在根目录中找到`config.yaml`写入修改VML的配置，当前支持硅基流动
+5.在根目录中找到`config.yaml`写入修改VML的配置，当前支持硅基流动api
 ```markdown
 gpt-api:
   api_key: sk-cxr******
   api_name: Siliconflow
   base_url: https://api.siliconflow.cn/v1
-#  model_name: deepseek-ai/deepseek-vl2
   model_name: Pro/Qwen/Qwen2.5-VL-7B-Instruct
 ```
-
 ## 使用方法
-### 命令行使用或者直接run
+### 命令行运行或者直接run
 ```bash
 python srcProject/main_process_sequence.py
 ```
 随后在目录`srcProject/output/visualizations`, 查看结果
-
 
 ## 项目结构
 ```
@@ -95,8 +92,5 @@ TextSnap/
 4.  推送到分支 (`git push origin feature/AmazingFeature`)
 5.  开启 Pull Request
 
-## 许可证
-本项目采用 MIT 许可证 - 详情见 LICENSE 文件
-
 ## 联系方式
-如有问题或建议，请联系: [your.email@example.com]
+如有问题或建议，请联系我微信: theysh_

@@ -107,7 +107,6 @@ def read_prediction(data:List[List[Dict[str, Any]]])->List[List[int]]:
     print(f'阅读顺序索引{order_in_list}')
     return order_in_list
 
-
 def generate_markdown_document(data: List[List[Dict[str, Any]]], reading_order: List[List[int]],
                                output_path: str) -> None:
     """
@@ -160,9 +159,7 @@ def generate_markdown_document(data: List[List[Dict[str, Any]]], reading_order: 
     print(f"Markdown文档已生成并保存到: {output_path}")
 
 if __name__ == '__main__':
-    sample_path = os.path.join(find_project_root(), 'tests/test_data/Realization of superhuman intelligence in microstrip filter design based on clustering-reinforcement learning.pdf')
-    # sample_path = os.path.join(find_project_root(), 'tests/test_data/Snipaste_2025-08-08_15-16-39.png')
-    # sample_path = r"F:\ysh_loc_office\ysgz\doc-pdf\0730_docx\xx.pdf"
+    sample_path = os.path.join(find_project_root(), 'tests/test_data/demo1_页面_1.png')
     file_name_without_extension, file_extension = os.path.splitext(os.path.basename(sample_path))
     detections = asyncio.run(layout_prediction(sample_path, bool_ocr=True))
     page_order = read_prediction(detections)
