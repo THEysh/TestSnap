@@ -1,19 +1,13 @@
-from modelscope.hub.api import HubApi
-
-YOUR_ACCESS_TOKEN = 'ms-25d9f4e4-32f2-4811-9c0a-ddfe760653e8'
-
-api = HubApi()
-api.login(YOUR_ACCESS_TOKEN)
-
-repo_id = 'theysh/TestSnap_model'
-local_folder_path = r'F:\ysh_loc_office\projects\practice\TextSnap\data\models\Relation'
-path_in_repo = 'models/Relation'
-max_workers = 1
-
+from huggingface_hub import HfApi
+import os
+from dotenv import load_dotenv # 导入 load_dotenv 函数
+from srcProject.utlis.common import find_project_root
+# 加载 .env 文件中的环境变量
+load_dotenv()
+api = HfApi(token=os.getenv("HF_TOKEN"))
 api.upload_folder(
-    repo_id=repo_id,
-    folder_path=local_folder_path,
-    path_in_repo=path_in_repo,
-    max_workers=max_workers,
-    commit_message='Upload Relation model files' # 这是一个可选的提交信息
+    folder_path=os.path.join(find_project_root(),"data/models/Relation"),
+    repo_id="THEYSH/testsnap",
+    repo_type="model",
+    path_in_repo="models/relation"
 )

@@ -10,7 +10,7 @@ layout_weights_config:
 read_weights_config:
   read_model:
     name: LayoutLMv3
-    path: data/models/Relation
+    path: data/models/relation
 
 gpt-api:
   api_key: sk-cxropeqeyqablbtbltjfqezajpziohsnlomwfuqecqnrtzxo
