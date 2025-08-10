@@ -13,8 +13,7 @@ read_weights_config:
     path: data/models/relation
 
 gpt-api:
-  api_key: sk-cxropeqeyqablbtbltjfqezajpziohsnlomwfuqecqnrtzxo
+  api_key: sk-****key
   api_name: Siliconflow
   base_url: https://api.siliconflow.cn/v1
-#  model_name: deepseek-ai/deepseek-vl2
   model_name: Pro/Qwen/Qwen2.5-VL-7B-Instruct
