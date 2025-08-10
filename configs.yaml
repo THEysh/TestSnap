@@ -1,6 +1,6 @@
 # config.yaml
 # 设备配置
-device: cuda # 可选: cuda / cpu / mps
+device: cpu # 可选: cuda / cpu / mps
 layout_weights_config:
   # DocLayout YOLO 模型配置
   layout_model:
