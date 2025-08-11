@@ -21,11 +21,11 @@ TextSnap 是一个功能强大的文档智能处理系统，专注于将非结�
   <img src="srcProject/output/demo1_页面_2/img.png" width="47%">
 </p>
 <p align="center">
-  <img src="srcProject/output/Realization of superhuman intelligence in microstrip filter design based on clustering-reinforcement learning/image.png" width="47%">
+  <img src="srcProject/output/Realization of superhuman intelligence in microstrip filter/image.png" width="47%">
   <img src="srcProject/output/多智能体强化学习综述/image.png" width="47%">
 </p>
 <p align="center">
-  <img src="srcProject/output/Realization of superhuman intelligence in microstrip filter design based on clustering-reinforcement learning/img.png" width="47%">
+  <img src="srcProject/output/Realization of superhuman intelligence in microstrip filter/img.png" width="47%">
   <img src="srcProject/output/多智能体强化学习综述/img.png" width="47%">
 </p>
 
