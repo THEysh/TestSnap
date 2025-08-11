@@ -3,10 +3,10 @@
 ## 项目概述
 TextSnap 是一个功能强大的文档智能处理系统，专注于将非结构化的 PDF 和图片文档转换为结构化的 Markdown 格式。该项目结合了先进的计算机视觉和自然语言处理技术，实现了从文档输入到结构化输出的完整流程。
 
-<img src="srcProject/output/demo1_页面_1/demo1_页面_1_demo1_页面_1.png" width="600">
-<img src="srcProject/output/demo1_页面_2/demo1_页面_2_demo1_页面_2.png" width="600">
-<img src="srcProject/output/demo1_页面_1/img.png" width="600">
-<img src="srcProject/output/demo1_页面_2/img.png" width="600">
+<img src="srcProject/output/demo1_页面_1/demo1_页面_1_demo1_页面_1.png" width="46%">
+<img src="srcProject/output/demo1_页面_2/demo1_页面_2_demo1_页面_2.png" width="46%">
+<img src="srcProject/output/demo1_页面_1/img.png" width="46%">
+<img src="srcProject/output/demo1_页面_2/img.png" width="46%">
 
 ## 核心功能
 - **多格式文档解析**：支持 PDF 和各种图片格式（PNG、JPG、BMP 等）的导入与解析
