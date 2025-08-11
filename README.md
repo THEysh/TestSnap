@@ -42,10 +42,26 @@ TextSnap 是一个功能强大的文档智能处理系统，专注于将非结�
    pip install -r requirements.txt
    ```
 
-4. 下载预训练模型
-   ```bash
-   python scripts/download_models.py
-   ```
+### **4. 下载预训练模型**
+运行以下脚本来自动下载所需的模型文件：
+```bash
+python scripts/download_models.py
+```
+这个脚本会自动下载模型并存放到项目的 `data/models/` 目录下。
+由于直接从 Hugging Face 下载可能会遇到网络问题，我们推荐使用手动下载方式来确保顺利获取文件。
+  * **国外用户**：请访问 [https://huggingface.co/THEYSH/testsnap](https://huggingface.co/THEYSH/testsnap)
+  * **国内用户**：请访问 [https://hf-mirror.com/THEYSH/testsnap](https://hf-mirror.com/THEYSH/testsnap)
+下载后，请确保 **`models` 目录下的所有文件** 按照以下结构存放在项目根目录中：
+```
+├── data/
+│   └── models/
+│       ├── relation/
+│       │   ├── config.json
+│       │   └── model.safetensors
+│       └── structure/
+│           └── doclayout_yolo_docstructbench_imgsz1280_2501.pt
+```
+
 5.在根目录中找到`config.yaml`写入修改VML的配置，当前支持硅基流动api
 ```markdown
 gpt-api:
@@ -65,15 +81,12 @@ python srcProject/main_process_sequence.py
 ```
 TextSnap/
 ├── .idea/                  # IDE配置文件
-├── .pytest_cache/          # 测试缓存
 ├── configs.yaml            # 配置文件
 ├── data/                   # 数据目录
 │   └── models/             # 模型文件
 ├── requirements.txt        # 依赖包列表
 ├── scripts/                # 脚本文件
 │   ├── download_models.py  # 下载模型脚本
-│   ├── prepare_environment.sh # 环境准备脚本
-│   └── run_cli.py          # 命令行入口
 ├── srcProject/             # 源代码
 │   ├── config/             # 配置模块
 │   ├── data_loaders/       # 数据加载器
@@ -84,13 +97,6 @@ TextSnap/
 └── tests/                  # 测试代码
     └── test_data/          # 测试数据
 ```
-
-## 贡献指南
-1.  Fork 项目仓库
-2.  创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3.  提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4.  推送到分支 (`git push origin feature/AmazingFeature`)
-5.  开启 Pull Request
 
 ## 联系方式
 如有问题或建议，请联系我微信: theysh_
