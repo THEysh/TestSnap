@@ -67,7 +67,7 @@ TextSnap is a powerful intelligent document processing system that focuses on co
     ```
 
 2.  Create and activate a virtual environment
-
+    *python*:3.10.18
     ```bash
     python -m venv venv
     # Windows

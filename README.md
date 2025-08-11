@@ -55,6 +55,7 @@ TextSnap 是一个功能强大的文档智能处理系统，专注于将非结�
    ```
 
 2. 创建并激活虚拟环境
+   *python*:3.10.18
    ```bash
    python -m venv venv
    # Windows
