@@ -12,14 +12,22 @@ TextSnap 是一个功能强大的文档智能处理系统，专注于将非结�
 
 ###  在目录`srcProject\output`下，可以看到几个效果示例
 
-<img src="srcProject/output/demo1_页面_1/demo1_页面_1_demo1_页面_1.png" width="47%">
-<img src="srcProject/output/demo1_页面_2/demo1_页面_2_demo1_页面_2.png" width="47%">
-<img src="srcProject/output/demo1_页面_1/img.png" width="47%">
-<img src="srcProject/output/demo1_页面_2/img.png" width="47%">
-<img src="srcProject\output\Realization of superhuman intelligence in microstrip filter design based on clustering-reinforcement learning\image.png" width="47%">
-<img src="srcProject\output\多智能体强化学习综述\image.png" width="47%">
-<img src="srcProject\output\Realization of superhuman intelligence in microstrip filter design based on clustering-reinforcement learning\img.png" width="47%">
-<img src="srcProject\output\多智能体强化学习综述\img.png" width="47%">
+<p align="center">
+  <img src="srcProject/output/demo1_页面_1/demo1_页面_1_demo1_页面_1.png" width="47%">
+  <img src="srcProject/output/demo1_页面_2/demo1_页面_2_demo1_页面_2.png" width="47%">
+</p>
+<p align="center">
+  <img src="srcProject/output/demo1_页面_1/img.png" width="47%">
+  <img src="srcProject/output/demo1_页面_2/img.png" width="47%">
+</p>
+<p align="center">
+  <img src="srcProject/output/Realization of superhuman intelligence in microstrip filter design based on clustering-reinforcement learning/image.png" width="47%">
+  <img src="srcProject/output/多智能体强化学习综述/image.png" width="47%">
+</p>
+<p align="center">
+  <img src="srcProject/output/Realization of superhuman intelligence in microstrip filter design based on clustering-reinforcement learning/img.png" width="47%">
+  <img src="srcProject/output/多智能体强化学习综述/img.png" width="47%">
+</p>
 
 ## 核心功能
 - **多格式文档解析**：支持 PDF 和各种图片格式（PNG、JPG、BMP 等）的导入与解析
