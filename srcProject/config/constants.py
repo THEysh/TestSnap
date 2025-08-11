@@ -68,7 +68,7 @@ DEFAULT_COLORS = {
 DEFAULT_COLOR_UNKNOWN = (200, 200, 200)
 
 # --- 指令映射 ---
-latex_expression = "When handling non-formula content, please identify and output the text directly, without using formula editing symbols like `$` or `\mathrm`. For content containing formulas, you must use standard LaTeX notation and ensure formatting accuracy. You need to separate the mathematical formulas from the text. The formula part should be enclosed in `$···$' (only including mathematical symbols and expressions). The text part should be written as a regular paragraph. Please note that the current output only supports the MathJax/KaTeX rendering environment.# 使用 BlockType 枚举作为键"
+latex_expression = "You don't need to worry about the line breaks in the image, don't use them when outputting. When handling non-formula content, please identify and output the text directly, without using formula editing symbols like `$` or `\mathrm`. For content containing formulas, you must use standard LaTeX notation and ensure formatting accuracy. You need to separate the mathematical formulas from the text. The formula part should be enclosed in `$···$' (only including mathematical symbols and expressions). The text part should be written as a regular paragraph. Please note that the current output only supports the MathJax/KaTeX rendering environment.# 使用 BlockType 枚举作为键"
 INSTRUCTION = {
     BlockType.TITLE: "Please output the text content from the image.",
     BlockType.PLAIN_TEXT: f"Please output the text content from the image. {latex_expression}",
