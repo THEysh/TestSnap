@@ -1,9 +1,8 @@
 import asyncio
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 from typing import List, Dict, Any
 from tqdm.asyncio import tqdm_asyncio
 from srcProject.config.constants import OCR_TEXT_VALUES, BlockType_MEMBER, BlockType
-import uuid
 from srcProject.data_loaders.pdf_dataset import PDFDataset
 from srcProject.models.layout_reader import find_reading_order_index
 from srcProject.models.model_manager import ModelManager
@@ -12,7 +11,6 @@ from srcProject.utlis.common import find_project_root, prepare_directory
 from srcProject.utlis.visualization.visualize_document import visualize_document
 import os
 
-# 实例化 ModelManager
 model_manager = ModelManager()
 
 async def layout_prediction(input_path: str, bool_ocr = True) -> List[List[Dict[str, Any]]]:
@@ -139,6 +137,7 @@ def generate_markdown_document(data: List[List[Dict[str, Any]]], reading_order: 
             if category_key_enum == BlockType.TITLE:
                 markdown_content.append(f"## {content}\n")
             elif category_key_enum in [BlockType.PLAIN_TEXT, BlockType.TABLE, BlockType.ISOLATE_FORMULA]:
+                content = content.replace("```html", "").replace("```", "")
                 markdown_content.append(f"{content}\n\n")
             elif category_key_enum in [BlockType.FIGURE_CAPTION, BlockType.TABLE_CAPTION, BlockType.TABLE_FOOTNOTE]:
                 markdown_content.append(f"_{content}_\n\n")
@@ -152,14 +151,13 @@ def generate_markdown_document(data: List[List[Dict[str, Any]]], reading_order: 
                     cropped_image.save(cropped_image_path)
                     markdown_content.append(f"![{unique_uuid}](images/{unique_uuid}.png)\n\n")
 
-    # 将拼接好的所有内容一次性写入文件，并打印一次日志
     final_markdown = "".join(markdown_content)
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(final_markdown)
     print(f"Markdown文档已生成并保存到: {output_path}")
 
 if __name__ == '__main__':
-    sample_path = os.path.join(find_project_root(), 'tests/test_data/demo1_页面_1.png')
+    sample_path = os.path.join(find_project_root(), 'tests/test_data/Human-level-control-through-deep.pdf')
     # sample_path = os.path.join(find_project_root(), "tests/test_data/多智能体强化学习综述.pdf")
     file_name_without_extension, file_extension = os.path.splitext(os.path.basename(sample_path))
     detections = asyncio.run(layout_prediction(sample_path, bool_ocr=True))

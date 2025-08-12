@@ -11,6 +11,7 @@ from typing import List, Any, Dict
 from PIL import Image
 from srcProject.config.settings import LAYOUT_MODEL_NAME, LAYOUT_WEIGHTS_PATH, READ_MODEL_NAME, READ_WEIGHTS_PATH, \
     FLOW_API_NAME, FLOW_API_KEY, FLOW_URL, DEVICE
+from srcProject.models.google_api import Google
 from srcProject.models.layout_detector import DocLayoutYOLO
 from srcProject.models.layout_reader import LayoutReader
 from srcProject.models.model_base import BaseModel
@@ -22,7 +23,7 @@ class ModelFactory:
     def create(model_name: str='api',
                model_Path: str='',
                device: str = 'cuda',
-               api_key: str = '',
+               api_key: list = '',
                base_url: str = '',
                api_name:str = '') -> BaseModel:
         if model_name.lower() == 'doclayout_yolo':
@@ -30,7 +31,9 @@ class ModelFactory:
         elif model_name.lower() == 'layoutlmv3':
             return LayoutReader(model_Path, device)
         elif model_name.lower() == 'siliconflow':
-            return Silicon(api_key=api_key, base_url=base_url, api_name=api_name)
+            return Silicon(api_keys=api_key, base_url=base_url, api_name=api_name)
+        elif model_name.lower() == 'google':
+            return Google(api_keys=api_key, api_name=api_name)
         else:
             raise ValueError(f"不支持的模型名称: {model_name}")
 

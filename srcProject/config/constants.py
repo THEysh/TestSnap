@@ -68,13 +68,14 @@ DEFAULT_COLORS = {
 DEFAULT_COLOR_UNKNOWN = (200, 200, 200)
 
 # --- 指令映射 ---
-latex_expression = "You don't need to worry about the line breaks in the image, don't use them when outputting. When handling non-formula content, please identify and output the text directly, without using formula editing symbols like `$` or `\mathrm`. For content containing formulas, you must use standard LaTeX notation and ensure formatting accuracy. You need to separate the mathematical formulas from the text. The formula part should be enclosed in `$···$' (only including mathematical symbols and expressions). The text part should be written as a regular paragraph. Please note that the current output only supports the MathJax/KaTeX rendering environment.# 使用 BlockType 枚举作为键"
+latex_expression = "When handling non-formula content, please identify and output the text directly, without using formula editing symbols like `$` or `\mathrm`. For content containing formulas, you must use standard LaTeX notation and ensure formatting accuracy. You need to separate the mathematical formulas from the text. The formula part should be enclosed in `$···$' (only including mathematical symbols and expressions). The text part should be written as a regular paragraph. Please note that the current output only supports the MathJax/KaTeX rendering environment."
+system_instruction = "You are a rigorous OCR assistant responsible only for recognizing image content. Your answer needs to meet the following requirements: 1. Unless a new paragraph or sentence ends, you should avoid line breaks in my output. 2. The output should not contain any greetings or additional explanations, only the plain text content in the image should be returned."
 INSTRUCTION = {
-    BlockType.TITLE: "Please output the text content from the image.",
-    BlockType.PLAIN_TEXT: f"Please output the text content from the image. {latex_expression}",
-    BlockType.FIGURE_CAPTION: f"Please output the text content from the image.{latex_expression}",
-    BlockType.TABLE: f"This image may be a table, if it is a table, please output the table in markdown format. {latex_expression}",
-    BlockType.TABLE_CAPTION: f"Please output the text content from the image. {latex_expression}",
-    BlockType.TABLE_FOOTNOTE: f"Please output the text content from the image. {latex_expression}",
-    BlockType.ISOLATE_FORMULA:"Please transcribe the expression from the image into LaTeX format. You must use standard LaTeX notation and ensure formatting accuracy. The formula part should be enclosed in `$$···$$'(eg. including mathematical symbols and expressions). Please note that the current output only supports the MathJax/KaTeX rendering environment."
+    BlockType.TITLE: f"Please output the text content from the image.{system_instruction}",
+    BlockType.PLAIN_TEXT: f"Please output the text content from the image.{system_instruction} {latex_expression}",
+    BlockType.FIGURE_CAPTION: f"Please output the text content from the image.{system_instruction}{latex_expression}",
+    BlockType.TABLE: f"This image may be a table, if it is a table, please output the table in **html**. {system_instruction}{latex_expression}",
+    BlockType.TABLE_CAPTION: f"Please output the text content from the image. {system_instruction}{latex_expression}",
+    BlockType.TABLE_FOOTNOTE: f"Please output the text content from the image. {system_instruction}{latex_expression}",
+    BlockType.ISOLATE_FORMULA:f"Please transcribe the expression from the image into LaTeX format. {system_instruction} You must use standard LaTeX notation and ensure formatting accuracy. The formula part should be enclosed in `$$···$$'(eg. including mathematical symbols and expressions). Please note that the current output only supports the MathJax/KaTeX rendering environment."
 }

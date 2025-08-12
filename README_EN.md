@@ -109,7 +109,7 @@ After downloading, please ensure that **all files in the `models` directory** ar
 │           └── doclayout_yolo_docstructbench_imgsz1280_2501.pt
 ```
 
-5.  In the root directory, locate and modify `config.yaml` to configure VML. The current version supports the Siliconflow API.
+5.  In the root directory, locate and modify `config.yaml` to configure VML. The current version supports the Siliconflow API, Google API
 
 <!-- end list -->
 
@@ -120,7 +120,14 @@ gpt-api:
   base_url: https://api.siliconflow.cn/v1
   model_name: Pro/Qwen/Qwen2.5-VL-7B-Instruct
 ```
-
+google
+```markdown
+gpt-api:
+  api_key: ["AIzaSyB***","AIza***","AIzaS***"]
+  api_name: google
+  base_url: https://generativelanguage.googleapis.com
+  model_name: models/gemini-2.0-flash # models/gemma-3-27b-it models/gemini-2.0-flash
+```
 -----
 
 ## Usage
@@ -130,9 +137,8 @@ gpt-api:
 ```bash
 python srcProject/main_process_sequence.py
 ```
-
 The results can be viewed in the `srcProject/output/visualizations` directory.
-
+Note that when using images or img predictions, try not to use spaces in file naming
 -----
 
 ## Project Structure
