@@ -64,9 +64,12 @@ class Google(FlowOCR):
             return await self._api_req(image_part, inf_Classkey, self._get_keys_index())
         else:
             return ""
-    async def _api_req(self, image_part: Part, inf_Class_key:BlockType=None, index:int=0) -> str:
+
+    async def _api_req(self, image_part: Part,
+                       inf_Class_key:BlockType = None,
+                       retries: int = 0) -> str:
         """
-        异步 API 请求函数。
+        异步 API 请求函数，支持重试。
         """
         try:
             inf_instruction = await self.instruction(inf_Class_key)
@@ -76,30 +79,25 @@ class Google(FlowOCR):
             )
             return response.text
         except Exception as e:
-            # 检查是否是 429 错误，并根据情况抛出自定义异常
-            if "429" in str(e):
-                print("捕获到 429 错误: 1分钟内访问了次数(突破google服务器限制)，从配置文件的api_key尝试获取其它的key，或者等待google服务器响应")
-                new_index = self._get_keys_index()
-                if new_index is not None:
-                    self.client = genai.Client(api_key=self.api_keys[new_index])
-                    return await self._api_req(image_part, inf_Class_key, new_index)
-                else:
-                    print("所有的key均不满足要求")
-                    return ""
-
-            elif "400" in str(e):
-                print("捕获到 400 错误: API key expired. Please renew the API key.")
-                self.key_index[index] = -1
-                new_index = self._get_keys_index()
-                if new_index is not None:
-                    self.client = genai.Client(api_key=self.api_keys[new_index])
-                    return await self._api_req(image_part, inf_Class_key,new_index)
-                else:
-                    print("所有的key均不满足要求")
-                    return ""
-            else:
-                print(f"API 请求或处理过程中发生未知错误: {e}")
+            # 如果重试次数超过限制，直接抛出异常
+            if retries >= 3:
+                print(f"API 请求失败，重试次数已达上限：{e}")
                 return ""
-
+            new_key,new_index = self._get_key()
+            if new_key is not None:
+                self.client = genai.Client(api_key=new_key)
+            # 处理特定的错误
+            if "429" in str(e):
+                print("捕获到 429 错误: 访问频率过高。google服务器拒绝，尝试从配置文件中keys中更换")
+                return await self._api_req(image_part, inf_Class_key)
+            elif "400" in str(e):
+                print("捕获到 400 错误: API 密钥已过期。")
+                self._set_key_index(new_index)
+                return await self._api_req(image_part, inf_Class_key)
+            else:
+                print(f"API 请求或处理过程中发生未知错误: {e}。开始第 {retries + 1} 次重试...")
+                # 可以在重试前添加一个短暂的等待时间，以避免立即失败
+                await asyncio.sleep(2 ** retries)
+                return await self._api_req(image_part, inf_Class_key, retries=retries + 1)
 
 

@@ -6,7 +6,8 @@ from srcProject.config.constants import OCR_TEXT_VALUES, BlockType_MEMBER, Block
 from srcProject.data_loaders.pdf_dataset import PDFDataset
 from srcProject.models.layout_reader import find_reading_order_index
 from srcProject.models.model_manager import ModelManager
-from srcProject.utlis.aftertreatment import batch_preprocess_detections, normalize_polygons_to_bboxes, poly_to_bbox
+from srcProject.utlis.aftertreatment import batch_preprocess_detections, normalize_polygons_to_bboxes, poly_to_bbox, \
+    convert_html_tables_to_markdown
 from srcProject.utlis.common import find_project_root, prepare_directory
 from srcProject.utlis.visualization.visualize_document import visualize_document
 import os
@@ -133,14 +134,17 @@ def generate_markdown_document(data: List[List[Dict[str, Any]]], reading_order: 
             category_key_enum = BlockType_MEMBER.get(category_id)
             if category_key_enum is None:
                 continue
+            content = content.replace("```html", "").replace("```markdown", "").replace("```", "")
             # 根据键名拼接内容
             if category_key_enum == BlockType.TITLE:
-                markdown_content.append(f"## {content}\n")
-            elif category_key_enum in [BlockType.PLAIN_TEXT, BlockType.TABLE, BlockType.ISOLATE_FORMULA]:
-                content = content.replace("```html", "").replace("```", "")
+                markdown_content.append(f"## {content}\n\n")
+            elif category_key_enum in [BlockType.PLAIN_TEXT, BlockType.ISOLATE_FORMULA]:
                 markdown_content.append(f"{content}\n\n")
             elif category_key_enum in [BlockType.FIGURE_CAPTION, BlockType.TABLE_CAPTION, BlockType.TABLE_FOOTNOTE]:
                 markdown_content.append(f"_{content}_\n\n")
+            elif category_key_enum ==BlockType.TABLE:
+                content = convert_html_tables_to_markdown(content)
+                markdown_content.append(f"{content}\n\n")
             elif category_key_enum == BlockType.FIGURE:
                 # 生成一个UUID对象
                 import uuid
@@ -150,14 +154,13 @@ def generate_markdown_document(data: List[List[Dict[str, Any]]], reading_order: 
                     cropped_image_path = os.path.join(images_path, f"{unique_uuid}.png")
                     cropped_image.save(cropped_image_path)
                     markdown_content.append(f"![{unique_uuid}](images/{unique_uuid}.png)\n\n")
-
     final_markdown = "".join(markdown_content)
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(final_markdown)
     print(f"Markdown文档已生成并保存到: {output_path}")
 
 if __name__ == '__main__':
-    sample_path = os.path.join(find_project_root(), 'tests/test_data/Human-level-control-through-deep.pdf')
+    sample_path = os.path.join(find_project_root(), 'tests/test_data/gae.pdf')
     # sample_path = os.path.join(find_project_root(), "tests/test_data/多智能体强化学习综述.pdf")
     file_name_without_extension, file_extension = os.path.splitext(os.path.basename(sample_path))
     detections = asyncio.run(layout_prediction(sample_path, bool_ocr=True))

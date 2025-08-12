@@ -64,14 +64,15 @@ class FlowOCR(BaseModel):
             # 如果列表中所有元素都是 -1，则返回 None 或其他指示值
             return None
 
-    def _get_key(self):
+    def _get_key(self)->tuple[str,int]|tuple[None,None]:
         """获取一个可用的API密钥"""
 
         index = self._get_keys_index()
         if index is None:
             print("出现错误，key池已经为空")
+            return None,None
         else:
-            return self.api_keys[index]
+            return self.api_keys[index], index
 
     def _set_key_index(self, index):
         """设置密钥索引为-1，表示该密钥已不可用"""

@@ -1,10 +1,10 @@
-import os.path
+import re
 from typing import List, Dict, Any
 import numpy as np
-
 from srcProject.config.constants import FilterCategories_VALUES
-from srcProject.utlis.common import find_project_root
 from PIL import Image
+import pandas as pd
+from io import StringIO
 
 # --- 辅助函数：将多边形坐标转换为四边形 (如果需要) ---
 # 你的模型返回的是 poly: [xmin, ymin, xmax, ymin, xmax, ymax, xmin, ymax]
@@ -72,21 +72,16 @@ def normalize_polygons_to_bboxes(data: List[List[Dict[str, Any]]]) -> List[List[
 
             # 使用 poly_to_bbox 函数将多边形转换为原始尺寸的边界框
             original_bbox = poly_to_bbox(poly)
-
             # 计算缩放比例
             x_scale = 1000.0 / width
             y_scale = 1000.0 / height
-
             # 使用缩放比例计算并四舍五入为整数
             x0 = int(round(original_bbox[0] * x_scale))
             y0 = int(round(original_bbox[1] * y_scale))
             x1 = int(round(original_bbox[2] * x_scale))
             y1 = int(round(original_bbox[3] * y_scale))
-
             page_bboxes.append([x0, y0, x1, y1])
-
         result.append(page_bboxes)
-
     return result
 
 
@@ -218,6 +213,34 @@ def batch_preprocess_detections(
         filtered_batch = preprocess_detections(detections_list, iou_threshold)
         processed_batches.append(filtered_batch)
     return processed_batches
+
+
+def convert_html_tables_to_markdown(content):
+    """
+    从字符串中提取所有 HTML 表格，将其转换为 Markdown 格式，
+    然后将修改后的内容返回，不保留任何额外 HTML 标签。
+    Args:
+        content (str): 包含 HTML 表格的原始字符串。
+    Returns:
+        str: 替换了表格内容的新字符串。
+    """
+    # 使用正则表达式找到所有 <table>...</table> 的内容
+    table_regex = re.compile(r'<table.*?</table>', re.IGNORECASE | re.DOTALL)
+    # 找到所有匹配的表格字符串
+    tables_found = table_regex.finditer(content)
+    replacements = []
+    for match in tables_found:
+        html_table = match.group(0)
+        # 将表格内容转换为 pandas DataFrame
+        df = pd.read_html(StringIO(html_table))[0]
+        df.columns = df.iloc[0]
+        # 删除第一行，因为现在它已经是列名了
+        df = df[1:]
+        markdown_table = df.to_markdown(index=False)
+        replacements.append((match.start(), match.end(), markdown_table))
+    for start, end, new_str in reversed(replacements):
+        content = content[:start] + new_str + content[end:]
+    return content
 
 if __name__ == '__main__':
     pass
