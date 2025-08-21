@@ -107,7 +107,7 @@ def read_prediction(data:List[List[Dict[str, Any]]])->List[List[int]]:
     return order_in_list
 
 def generate_markdown_document(data: List[List[Dict[str, Any]]], reading_order: List[List[int]],
-                               output_path: str) -> None:
+                               output_path: str) -> str:
     """
     根据 OCR 结果和阅读顺序生成 Markdown 文档并保存。
     Args:
@@ -158,9 +158,10 @@ def generate_markdown_document(data: List[List[Dict[str, Any]]], reading_order: 
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(final_markdown)
     print(f"Markdown文档已生成并保存到: {output_path}")
+    return final_markdown
 
 if __name__ == '__main__':
-    sample_path = os.path.join(find_project_root(), 'tests/test_data/demo1_页面_1.png')
+    sample_path = os.path.join(find_project_root(), 'tests/test_data/demo1_页面_3.png')
     # sample_path = os.path.join(find_project_root(), "tests/test_data/多智能体强化学习综述.pdf")
     file_name_without_extension, file_extension = os.path.splitext(os.path.basename(sample_path))
     detections = asyncio.run(layout_prediction(sample_path, bool_ocr=True))

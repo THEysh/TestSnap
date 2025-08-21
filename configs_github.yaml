@@ -1,0 +1,26 @@
+# config.yaml
+# 设备配置
+# --
+device: cuda # 可选: cuda / cpu / mps
+layout_weights_config:
+  # DocLayout YOLO 模型配置
+  layout_model:
+    name: doclayout_yolo # 这个名称将用于 LayoutDetectorFactory
+    path: data/models/structure/doclayout_yolo_docstructbench_imgsz1280_2501.pt # 这是一个相对路径，相对于 models_dir
+
+read_weights_config:
+  read_model:
+    name: Xy_Cut # Xy_Cut ; LayoutLMv3
+    path: data/models/relation
+
+gpt-api:
+  api_key: ["sk-cxropeq*****"]
+  api_name: Siliconflow
+  base_url: https://api.siliconflow.cn/v1
+  model_name: Pro/Qwen/Qwen2.5-VL-7B-Instruct # Pro/Qwen/Qwen2.5-VL-7B-Instruct ； Qwen/Qwen2.5-VL-72B-Instruct
+
+#gpt-api:
+#  api_key: ["AIzaSyBNY****","AIzaSyD955y4****","AIzaSy*****"]
+#  api_name: google
+#  base_url: https://generativelanguage.googleapis.com
+#  model_name: models/gemma-3-27b-it # models/gemma-3-27b-it models/gemini-2.0-flash  models/gemini-2.5-flash
