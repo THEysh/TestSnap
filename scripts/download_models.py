@@ -1,5 +1,7 @@
 import os
 from huggingface_hub import snapshot_download
+
+from srcProject.config.settings import READ_MODEL_NAME
 from srcProject.utlis.common import find_project_root
 
 # https://huggingface.co/THEYSH/testsnap/tree/main/models
@@ -67,10 +69,11 @@ def download_and_verify_model(repo_id, subfolder, local_dir):
 
 if __name__ == '__main__':
     model_root_path = os.path.join(find_project_root(), "data")
-    dirs_to_download = [
-        {"repo_id": "THEYSH/testsnap", "subfolder": "models/structure"},
-        {"repo_id": "THEYSH/testsnap", "subfolder": "models/relation"},
-    ]
+
+    dirs_to_download = [{"repo_id": "THEYSH/testsnap", "subfolder": "models/structure"},]
+    if READ_MODEL_NAME.lower() == "layoutLMv3":
+        dirs_to_download.append({"repo_id": "THEYSH/testsnap", "subfolder": "models/relation"})
+
     for dir_info in dirs_to_download:
         download_and_verify_model(
             repo_id=dir_info['repo_id'],
@@ -78,12 +81,3 @@ if __name__ == '__main__':
             local_dir=model_root_path
         )
         print("-" * 50)
-    # 最终验证
-    print("\n" + "=" * 50)
-    print("最终验证：")
-    structure_valid = check_files_exist(model_root_path, "models/structure")
-    relation_valid = check_files_exist(model_root_path, "models/relation")
-    print(f"\n验证总结：")
-    print(f"Structure 模型文件：{'有效' if structure_valid else '缺失'}")
-    print(f"Relation 模型文件：{'有效' if relation_valid else '缺失'}")
-    print("=" * 50)

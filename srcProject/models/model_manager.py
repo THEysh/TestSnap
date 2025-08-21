@@ -16,7 +16,7 @@ from srcProject.models.layout_detector import DocLayoutYOLO
 from srcProject.models.layout_reader import LayoutReader
 from srcProject.models.model_base import BaseModel
 from srcProject.models.siliconflow_api import Silicon
-from srcProject.models.xy_cut import XY_CUT
+from srcProject.models.reader_xy_cut import XY_CUT
 
 
 class ModelFactory:

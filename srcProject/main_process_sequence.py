@@ -6,7 +6,7 @@ from srcProject.config.constants import OCR_TEXT_VALUES, BlockType_MEMBER, Block
 from srcProject.data_loaders.pdf_dataset import PDFDataset
 from srcProject.models.layout_reader import find_reading_order_index
 from srcProject.models.model_manager import ModelManager
-from srcProject.models.xy_cut import XY_CUT
+from srcProject.models.reader_xy_cut import XY_CUT
 from srcProject.utlis.aftertreatment import batch_preprocess_detections, normalize_polygons_to_bboxes, poly_to_bbox, \
     convert_html_tables_to_markdown
 from srcProject.utlis.common import find_project_root, prepare_directory
