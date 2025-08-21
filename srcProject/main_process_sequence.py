@@ -6,6 +6,7 @@ from srcProject.config.constants import OCR_TEXT_VALUES, BlockType_MEMBER, Block
 from srcProject.data_loaders.pdf_dataset import PDFDataset
 from srcProject.models.layout_reader import find_reading_order_index
 from srcProject.models.model_manager import ModelManager
+from srcProject.models.xy_cut import XY_CUT
 from srcProject.utlis.aftertreatment import batch_preprocess_detections, normalize_polygons_to_bboxes, poly_to_bbox, \
     convert_html_tables_to_markdown
 from srcProject.utlis.common import find_project_root, prepare_directory
@@ -100,8 +101,7 @@ async def ocr_test(data: List[List[Dict[str, Any]]], max_concurrent_tasks: int =
     return data
 
 def read_prediction(data:List[List[Dict[str, Any]]])->List[List[int]]:
-    boxes_detections = normalize_polygons_to_bboxes(data)
-    page_order = model_manager.read_model.batch_predict(boxes_detections)
+    page_order = model_manager.read_model.batch_predict(data)
     order_in_list = find_reading_order_index(page_order)
     print(f'阅读顺序索引{order_in_list}')
     return order_in_list
@@ -160,7 +160,7 @@ def generate_markdown_document(data: List[List[Dict[str, Any]]], reading_order: 
     print(f"Markdown文档已生成并保存到: {output_path}")
 
 if __name__ == '__main__':
-    sample_path = os.path.join(find_project_root(), 'tests/test_data/gae.pdf')
+    sample_path = os.path.join(find_project_root(), 'tests/test_data/demo1_页面_1.png')
     # sample_path = os.path.join(find_project_root(), "tests/test_data/多智能体强化学习综述.pdf")
     file_name_without_extension, file_extension = os.path.splitext(os.path.basename(sample_path))
     detections = asyncio.run(layout_prediction(sample_path, bool_ocr=True))

@@ -16,6 +16,7 @@ from srcProject.models.layout_detector import DocLayoutYOLO
 from srcProject.models.layout_reader import LayoutReader
 from srcProject.models.model_base import BaseModel
 from srcProject.models.siliconflow_api import Silicon
+from srcProject.models.xy_cut import XY_CUT
 
 
 class ModelFactory:
@@ -30,6 +31,8 @@ class ModelFactory:
             return DocLayoutYOLO(model_Path, device)
         elif model_name.lower() == 'layoutlmv3':
             return LayoutReader(model_Path, device)
+        elif model_name.lower() == 'xy_cut':
+            return XY_CUT()
         elif model_name.lower() == 'siliconflow':
             return Silicon(api_keys=api_key, base_url=base_url, api_name=api_name)
         elif model_name.lower() == 'google':
@@ -57,7 +60,7 @@ class ModelManager:
             model_Path=READ_WEIGHTS_PATH,
             device=device
         )
-        print(f"已加载布局模型: {READ_MODEL_NAME}")
+        print(f"已加载阅读顺序模型/算法: {READ_MODEL_NAME}")
         self.ocr_recognizer = ModelFactory.create(
             api_key=FLOW_API_KEY,
             base_url=FLOW_URL,

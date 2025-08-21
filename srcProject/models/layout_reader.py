@@ -5,8 +5,10 @@ from PIL import Image, ImageDraw
 from transformers import LayoutLMv3ForTokenClassification
 from srcProject.models.helpers import boxes2inputs, prepare_inputs, parse_logits
 from srcProject.models.model_base import BaseModel
+from srcProject.utlis.aftertreatment import normalize_polygons_to_bboxes
 from srcProject.utlis.common import find_project_root
-from typing import List, Dict
+from typing import List, Dict, Any
+
 
 class LayoutReader(BaseModel):
     """
@@ -55,15 +57,16 @@ class LayoutReader(BaseModel):
         # 解析 logits，得到排序索引
         return parse_logits(logits, len(boxes))
 
-    def batch_predict(self, list_of_boxes: List[List[List[int]]]) -> List[List[int]]:
+    def batch_predict(self, data:List[List[Dict[str, Any]]]) -> List[List[int]]:
         """
         批量预测多个页面中边界框的阅读顺序。
         Args:
-            list_of_boxes (List[List[List[int]]]): 多个页面的边界框列表，格式为 [[[x0, y0, x1, y1], ...], ...]。
+            data (List[List[Dict[str, Any]]]): 多个页面的边界框列表。
 
         Returns:
             List[List[int]]: 每个页面的排序索引列表。
         """
+        list_of_boxes = normalize_polygons_to_bboxes(data)
         if not self.model:
             raise RuntimeError("模型未加载。")
         all_sorted_indices = []
