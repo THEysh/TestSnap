@@ -13,8 +13,8 @@ from srcProject.utlis.common import find_project_root, prepare_directory
 from srcProject.utlis.visualization.visualize_document import visualize_document
 import os
 
-model_manager = ModelManager()
 
+model_manager = ModelManager()
 async def layout_prediction(input_path: str, bool_ocr = True) -> List[List[Dict[str, Any]]]:
     """
     处理单个文档，执行布局分析、文本提取和结构化，并进行可视化。
@@ -160,21 +160,22 @@ def generate_markdown_document(data: List[List[Dict[str, Any]]], reading_order: 
     print(f"Markdown文档已生成并保存到: {output_path}")
     return final_markdown
 
-if __name__ == '__main__':
-    sample_path = os.path.join(find_project_root(), 'tests/test_data/demo1_页面_3.png')
-    # sample_path = os.path.join(find_project_root(), "tests/test_data/多智能体强化学习综述.pdf")
+def main(path):
+    sample_path = os.path.join(find_project_root(), path)
     file_name_without_extension, file_extension = os.path.splitext(os.path.basename(sample_path))
     detections = asyncio.run(layout_prediction(sample_path, bool_ocr=True))
     page_order = read_prediction(detections)
-    output_directory = "srcProject/output/visualizations"
     visualize_document(
         input_path=sample_path,  # 传入原始输入路径
         detections_per_page=detections,
         category_names=model_manager.layout_category_names,
-        output_directory = output_directory,
         page_order= page_order,
         file_prefix = file_name_without_extension,
         dpi_for_image_output=300  # 保持与加载图片DPI一致
     )
     md_save_path = os.path.join(find_project_root(), f"srcProject/output/visualizations/{file_name_without_extension}", f"{file_name_without_extension}.md")
     generate_markdown_document(detections,page_order,output_path= md_save_path)
+    return md_save_path
+if __name__ == '__main__':
+    # "tests/test_data/多智能体强化学习综述.pdf"
+    main('tests/test_data/demo1_页面_3.png')

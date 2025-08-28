@@ -58,7 +58,7 @@
         }
         
         .container {
-            max-width: 1200px;
+            max-width: 1500px;
             margin: 0 auto;
             background: rgba(255, 255, 255, 0.98);
             border-radius: 20px;
@@ -88,7 +88,7 @@
         
         .header h1 {
             font-size: 2.5em;
-            margin-bottom: 10თთт;
+            margin-bottom: 1em;
             position: relative;
             z-index: 1;
         }
@@ -343,52 +343,8 @@
         <div class="editor-container">
             <div class="editor-pane">
                 <h2>Markdown 输入</h2>
-                <textarea id="markdown-input" placeholder="在这里输入 Markdown 内容...
-
-支持的功能：
-- **粗体** 和 *斜体*
-- 标题 (# ## ###)
-- 列表和引用
-- 代码块
-- 数学公式:
-  - 行内公式: $E = mc^2$
-  - 独立公式: $$\sum_{i=1}^{n} x_i$$
-  
-试试您的示例公式！">
-# 强化学习公式示例
-
-The latter formulas use the definitions
-
-## 价值函数定义
-
-状态价值函数（State Value Function）：
-$$V^\pi(s_t) := \mathbb{E}_{s_{t+1: \infty}, a_{t: \infty}} \left[ \sum_{l=0}^\infty r_{t+l} \right]$$
-
-动作价值函数（Action Value Function）：
-$$Q^\pi(s_t, a_t) := \mathbb{E}_{s_{t+1: \infty}, a_{t+1: \infty}} \left[ \sum_{l=0}^\infty r_{t+l} \right]$$
-
-优势函数（Advantage Function）：
-$$A^{\pi}(s_t, a_t) = Q^{\pi}(s_t, a_t) - V^{\pi}(s_t), \quad \text{(Advantage function)}.$$
-
-## 其他示例
-
-这里是一个行内公式示例：爱因斯坦的质能方程 $E = mc^2$ 是物理学中最著名的公式之一。
-
-### 更多数学公式
-
-积分示例：
-$$\int_{-\infty}^{\infty} e^{-x^2} dx = \sqrt{\pi}$$
-
-矩阵示例：
-$$
-\begin{bmatrix}
-a_{11} & a_{12} & a_{13} \\
-a_{21} & a_{22} & a_{23} \\
-a_{31} & a_{32} & a_{33}
-\end{bmatrix}
-$$</textarea>
+                <textarea id="markdown-input" readonly></textarea>
             </div>
-            
             <div class="preview-pane">
                 <h2>渲染预览</h2>
                 <div id="preview"></div>
@@ -396,91 +352,147 @@ $$</textarea>
         </div>
     </div>
     
-    <script>
-        // 自定义渲染器来保留数学公式
-        const renderer = new marked.Renderer();
-        
-        // 配置 marked 选项
-        marked.setOptions({
-            renderer: renderer,
-            highlight: function(code, lang) {
-                return code;
-            },
-            pedantic: false,
-            gfm: true,
-            breaks: true,
-            sanitize: false,
-            smartLists: true,
-            smartypants: false,
-            xhtml: false
+<script>
+
+    // 在这里添加获取 URL 查询参数的逻辑
+    function getQueryParam(param) {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get(param);
+    }
+    // 从 URL 中获取 'file' 参数，如果不存在，则使用默认值
+    const dynamicFilePath = getQueryParam('file') || 'srcProject/output/gae/gae.md';
+    // 将变量名从 filePath 改为 dynamicFilePath，避免与原代码冲突
+    const filePath = dynamicFilePath;
+
+    const renderer = new marked.Renderer();
+    // 配置 marked 选项
+    marked.setOptions({
+        renderer: renderer,
+        highlight: function(code, lang) {
+            return code;
+        },
+        pedantic: false,
+        gfm: true,
+        breaks: true,
+        sanitize: false,
+        smartLists: true,
+        smartypants: false,
+        xhtml: false
+    });
+
+    function extractPath(filePath) {
+        const lastSlashIndex = filePath.lastIndexOf('/');
+        if (lastSlashIndex !== -1) {
+            // 提取从开头到最后一个斜杠之前的所有内容
+            return filePath.substring(0, lastSlashIndex);
+        }
+        // 如果没有找到斜杠，则返回空字符串或 null，表示没有路径
+        return '';
+        }
+
+    function updateImagePaths(markdownContent, baseDir) {
+    const imgRegex = /!\[.*?\]\((.*?)\)/g;
+    return markdownContent.replace(imgRegex, (match, path) => {
+        // 检查路径是否已经是绝对路径或包含 http
+        if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('/') || path.startsWith('./')) {
+            return match; // 不修改绝对路径或已处理过的路径
+        }
+        // 构建新的路径，例如：'demo1/images/...'
+        const newPath = `${baseDir}/${path}`;
+        // 替换原始路径并返回
+        return match.replace(path, newPath);
+    });
+}
+
+    function renderMarkdown(input) { // 函数现在接收一个参数
+        const preview = document.getElementById('preview');
+
+        // 保护数学公式不被 Markdown 解析器处理
+        let tempStorage = [];
+        let tempIndex = 0;
+
+        // 保护块级公式
+        let protectedInput = input.replace(/\$\$[\s\S]*?\$\$/g, function(match) {
+            const placeholder = `MATH_BLOCK_${tempIndex}`;
+            tempStorage[tempIndex] = match;
+            tempIndex++;
+            return placeholder;
         });
-        
-        function renderMarkdown() {
-            const input = document.getElementById('markdown-input').value;
-            const preview = document.getElementById('preview');
-            
-            // 保护数学公式不被 Markdown 解析器处理
-            let tempStorage = [];
-            let tempIndex = 0;
-            
-            // 保护块级公式
-            let protectedInput = input.replace(/\$\$[\s\S]*?\$\$/g, function(match) {
-                const placeholder = `MATH_BLOCK_${tempIndex}`;
-                tempStorage[tempIndex] = match;
-                tempIndex++;
-                return placeholder;
+
+        // 保护行内公式
+        protectedInput = protectedInput.replace(/\$(?!\$)([^\$\n]+?)\$/g, function(match) {
+            const placeholder = `MATH_INLINE_${tempIndex}`;
+            tempStorage[tempIndex] = match;
+            tempIndex++;
+            return placeholder;
+        });
+
+        // 使用 marked 解析 Markdown
+        let html = marked.parse(protectedInput);
+
+        // 恢复数学公式
+        html = html.replace(/MATH_BLOCK_(\d+)/g, function(match, index) {
+            return tempStorage[parseInt(index)];
+        });
+
+        html = html.replace(/MATH_INLINE_(\d+)/g, function(match, index) {
+            return tempStorage[parseInt(index)];
+        });
+
+        // 更新预览
+        preview.innerHTML = html;
+
+        // 触发 MathJax 重新渲染
+        if (window.MathJax) {
+            MathJax.typesetPromise([preview]).catch(function(err) {
+                console.log('MathJax 渲染错误: ', err);
             });
-            
-            // 保护行内公式
-            protectedInput = protectedInput.replace(/\$(?!\$)([^\$\n]+?)\$/g, function(match) {
-                const placeholder = `MATH_INLINE_${tempIndex}`;
-                tempStorage[tempIndex] = match;
-                tempIndex++;
-                return placeholder;
-            });
-            
-            // 使用 marked 解析 Markdown
-            let html = marked.parse(protectedInput);
-            
-            // 恢复数学公式
-            html = html.replace(/MATH_BLOCK_(\d+)/g, function(match, index) {
-                return tempStorage[parseInt(index)];
-            });
-            
-            html = html.replace(/MATH_INLINE_(\d+)/g, function(match, index) {
-                return tempStorage[parseInt(index)];
-            });
-            
-            // 更新预览
-            preview.innerHTML = html;
-            
-            // 触发 MathJax 重新渲染
-            if (window.MathJax) {
-                MathJax.typesetPromise([preview]).catch(function(err) {
-                    console.log('MathJax 渲染错误: ', err);
-                });
-            }
         }
-        
-        // 防抖函数
-        function debounce(func, wait) {
-            let timeout;
-            return function executedFunction(...args) {
-                const later = () => {
-                    clearTimeout(timeout);
-                    func(...args);
-                };
+    }
+    // 防抖函数
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
                 clearTimeout(timeout);
-                timeout = setTimeout(later, wait);
+                func(...args);
             };
-        }
-        
-        // 添加输入事件监听器
-        const debouncedRender = debounce(renderMarkdown, 300);
-        document.getElementById('markdown-input').addEventListener('input', debouncedRender);
-        
-        // 页面加载时渲染一次
-        window.addEventListener('load', renderMarkdown);
-    </script>
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+    // 添加输入事件监听器
+    const markdownInput = document.getElementById('markdown-input');
+    const debouncedRender = debounce(() => {
+        renderMarkdown(markdownInput.value);
+    }, 300);
+    markdownInput.addEventListener('input', debouncedRender);
+
+    const path = extractPath(filePath);
+    window.addEventListener('load', () => {
+        fetch(filePath)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('网络请求失败或文件不存在');
+                }
+                return response.text();
+            })
+            .then(markdownContent => {
+                // 在渲染前，先统一修改图片路径
+                const updatedContent = updateImagePaths(markdownContent, path);
+
+                // 将修改后的内容写入 textarea
+                markdownInput.value = updatedContent;
+
+                // 渲染修改后的内容
+                renderMarkdown(updatedContent);
+            })
+            .catch(error => {
+                console.error('读取 .md 文件时出错:', error);
+                // 发生错误时，可以使用 textarea 的默认内容
+                renderMarkdown(markdownInput.value);
+            });
+    });
+</script>
 </body>
 </html>

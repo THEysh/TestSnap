@@ -4,6 +4,8 @@ import fitz
 from PIL import Image
 import os
 from typing import List, Tuple, Any, Optional
+from srcProject.main_process_sequence import main
+from srcProject.utlis.common import find_project_root, find_file_with_suffix
 
 pdf_cache = {
     "images": [],
@@ -17,11 +19,7 @@ output_cache = {
     "current_page": 0,
     "total_pages": 0,
 }
-
-OUTPUT_PDF_PATH = r"F:\ysh_loc_office\projects\practice\TextSnap\srcProject\output\visualizations\demo1\demo1_combined.pdf"
-# 定义你的Markdown文件路径
-MARKDOWN_FILE_PATH = r"F:\ysh_loc_office\projects\practice\TextSnap\srcProject\output\visualizations\demo1\demo1.md"
-
+MARKDOWN_FILE_PATH = None
 
 def load_file(file: str | None) -> Tuple[Optional[Image.Image], str, Optional[Image.Image], Any]:
     """
@@ -73,14 +71,14 @@ def load_file(file: str | None) -> Tuple[Optional[Image.Image], str, Optional[Im
     return pages[0], f"<div id='page_info_box'>1 / {len(pages)}</div>", None, gr.update(visible=True)
 
 
-def load_output_pdf() -> List[Image.Image]:
+def load_output_pdf(out_path) -> List[Image.Image]:
     """
     加载指定路径的输出PDF文件并转换为图片列表。
     """
     output_images = []
-    if os.path.exists(OUTPUT_PDF_PATH):
+    if os.path.exists(out_path):
         try:
-            doc = fitz.open(OUTPUT_PDF_PATH)
+            doc = fitz.open(out_path)
             for page_num in range(len(doc)):
                 page = doc.load_page(page_num)
                 mat = fitz.Matrix(2.0, 2.0)
@@ -88,11 +86,11 @@ def load_output_pdf() -> List[Image.Image]:
                 img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
                 output_images.append(img)
             doc.close()
-            print(f"Successfully loaded output PDF: {OUTPUT_PDF_PATH}")
+            print(f"Successfully loaded output PDF: {out_path}")
         except Exception as e:
             print(f"Failed to load output PDF: {e}")
     else:
-        print(f"Output PDF not found: {OUTPUT_PDF_PATH}")
+        print(f"Output PDF not found: {out_path}")
 
     return output_images
 
@@ -117,52 +115,30 @@ def turn_page(direction: str) -> Tuple[Optional[Image.Image], str, Optional[Imag
     return current_image, f"<div id='page_info_box'>{index + 1} / {pdf_cache['total_pages']}", output_image
 
 
-def convert_to_markdown() -> str:
-    """
-    读取指定路径的Markdown文件内容。
-
-    Returns:
-        str: Markdown文件中的内容，如果文件不存在则返回错误信息。
-    """
-    file_path = pdf_cache["file_path"]
-    if file_path is None:
-        return "### 请先上传一个文件。"
-
-    # 检查Markdown文件是否存在
-    if not os.path.exists(MARKDOWN_FILE_PATH):
-        return f"### 错误：找不到Markdown文件。\n\n**路径:** `{MARKDOWN_FILE_PATH}`"
-
-    try:
-        # 使用utf-8编码读取文件内容
-        with open(MARKDOWN_FILE_PATH, 'r', encoding='utf-8') as f:
-            markdown_content = f.read()
-
-        # 返回文件内容
-        return markdown_content
-    except Exception as e:
-        # 如果读取过程中出现错误，返回错误信息
-        return f"### 错误：读取Markdown文件失败。\n\n**原因:** {e}"
-
-def process_all() -> Tuple[Optional[Image.Image], str]:
+def process_all() -> Optional[Image.Image]:
     """
     处理所有页面，加载输出PDF并转换为包含LaTeX的HTML。
     """
     if not pdf_cache["images"]:
-        return None, "### 🕐 请先上传一个文件。"
-
-    output_images = load_output_pdf()
+        return None
+    MARKDOWN_FILE_PATH = main(pdf_cache['file_path'])
+    file_name_without_extension, file_extension = os.path.splitext(os.path.basename(str(pdf_cache['file_path'])))
+    new_path = os.path.join(find_project_root(), f"srcProject/output/visualizations/{file_name_without_extension}")
+    print(new_path)
+    if file_extension==".png":
+        out_path =find_file_with_suffix(new_path, file_name_without_extension,".png")
+    elif file_extension==".pdf":
+        out_path =find_file_with_suffix(new_path, "combined", ".pdf")
+    else:
+        return None
+    output_images = load_output_pdf(out_path)
     output_cache["images"] = output_images
     output_cache["current_page"] = 0
     output_cache["total_pages"] = len(output_images)
-
-    # 转换成 Markdown (包含LaTeX)
-    markdown_result = convert_to_markdown()
-
     first_output_image = output_images[0] if output_images else None
-    return first_output_image, markdown_result
+    return first_output_image
 
-
-def clear_all() -> Tuple[None, None, str, Any, None, str]:
+def clear_all() -> Tuple[None, None, str, Any, None]:
     """
     清空所有输入和输出。
     """
@@ -178,10 +154,8 @@ def clear_all() -> Tuple[None, None, str, Any, None, str]:
         None,
         "<div id='page_info_box'>0 / 0</div>",
         gr.update(visible=False),
-        None,
-        "### 🕐 等待转换结果..."
+        None
     )
-
 
 css = """
 #page_info_html {
@@ -230,7 +204,7 @@ with gr.Blocks(theme="ocean", css=css, title='文件转换与预览') as demo:
             <h1 style="margin: 0; font-size: 2em;"> pdf -> md </h1>
         </div>
         <div style="text-align: center; margin-bottom: 10px;">
-            <em>上传文件并将其转换为 Markdown 文档</em>
+            <em> </em>
         </div>
     """)
 
@@ -260,14 +234,9 @@ with gr.Blocks(theme="ocean", css=css, title='文件转换与预览') as demo:
                             gr.Markdown("### 📄 输出PDF预览")
                             output_display = gr.Image(label="输出PDF预览", show_label=True, height=800,
                                                       container=True, show_download_button=False)
-
-                with gr.TabItem("Markdown 文档"):
-                    gr.Markdown("### ✨ 转换结果")
-                    # 使用 gr.Markdown 替代 gr.HTML
-                    markdown_view = gr.Markdown(
-                        value="### 🕐 等待转换结果...",
-                        elem_id="markdown_output")
-
+                with gr.TabItem("markdown"):
+                    with gr.Row():
+                        gr.HTML(html_content)
     pdf_input.upload(
         fn=load_file,
         inputs=pdf_input,
@@ -280,13 +249,13 @@ with gr.Blocks(theme="ocean", css=css, title='文件转换与预览') as demo:
     process_button.click(
         fn=process_all,
         inputs=None,
-        outputs=[output_display, markdown_view],  # 输出到 markdown_view
+        outputs=[output_display],
         show_progress=True
     )
 
     clear_button.click(
         fn=clear_all,
-        outputs=[pdf_input, pdf_view, page_info, pdf_view, output_display, markdown_view],  # 输出到 markdown_view
+        outputs=[pdf_input, pdf_view, page_info, pdf_view, output_display],
         show_progress=False
     )
 
