@@ -354,16 +354,7 @@
     
 <script>
 
-    // 在这里添加获取 URL 查询参数的逻辑
-    function getQueryParam(param) {
-        const urlParams = new URLSearchParams(window.location.search);
-        return urlParams.get(param);
-    }
-    // 从 URL 中获取 'file' 参数，如果不存在，则使用默认值
-    const dynamicFilePath = getQueryParam('file') || 'srcProject/output/gae/gae.md';
-    // 将变量名从 filePath 改为 dynamicFilePath，避免与原代码冲突
-    const filePath = dynamicFilePath;
-
+    const filePath = 'srcProject/output/gae/gae.md';
     const renderer = new marked.Renderer();
     // 配置 marked 选项
     marked.setOptions({
