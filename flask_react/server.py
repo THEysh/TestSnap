@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
 import mimetypes
+import shutil
 from pathlib import Path
 from srcProject.utlis.common import find_project_root
 from werkzeug.utils import secure_filename
@@ -19,14 +20,23 @@ mimetypes.add_type('image/svg+xml', '.svg')
 # 配置上传文件夹
 UPLOAD_FOLDER = os.path.join(project_root, 'flask_react/uploads', 'pdfs')
 PROCESSED_FOLDER = os.path.join(project_root, 'flask_react/uploads', 'processed')
+# 新增：图片上传配置
+IMAGE_UPLOAD_FOLDER = os.path.join(project_root, 'flask_react/uploads', 'images')
+IMAGE_PROCESSED_FOLDER = os.path.join(project_root, 'flask_react/uploads', 'processed_images')
+# 允许的文件类型
 ALLOWED_EXTENSIONS = {'pdf'}
+ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'}
 
 # 确保上传目录存在
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(PROCESSED_FOLDER, exist_ok=True)
+os.makedirs(IMAGE_UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(IMAGE_PROCESSED_FOLDER, exist_ok=True)
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['PROCESSED_FOLDER'] = PROCESSED_FOLDER
+app.config['IMAGE_UPLOAD_FOLDER'] = IMAGE_UPLOAD_FOLDER
+app.config['IMAGE_PROCESSED_FOLDER'] = IMAGE_PROCESSED_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
 @app.route('/api/markdown', methods=['POST'])
 def get_markdown():
@@ -151,8 +161,13 @@ def serve_file(filename):
             'error': f'文件服务错误: {str(e)}'
         }), 500
 
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def allowed_image_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
+
 
 def process_pdf(file_path):
     """
@@ -186,6 +201,43 @@ def process_pdf(file_path):
         return {
             'success': False,
             'error': f'PDF处理失败: {str(e)}'
+        }
+
+def process_image(file_path):
+    """
+    处理图片文件 - 这里可以添加你的图片处理逻辑
+    例如：调整大小、压缩、滤镜效果、格式转换等
+    目前作为示例，我们简单复制文件并添加处理标记
+    """
+    try:
+        # 生成处理后的文件名
+        filename = os.path.basename(file_path)
+        name, ext = os.path.splitext(filename)
+        processed_filename = f"{name}_processed{ext}"
+        processed_path = os.path.join(app.config['IMAGE_PROCESSED_FOLDER'], processed_filename)
+        
+        # 这里可以添加实际的图片处理逻辑
+        # 作为示例，我们只是复制文件
+        import shutil
+        shutil.copy2(file_path, processed_path)
+        
+        print(f"图片处理完成: {processed_filename}")
+        # 返回处理结果信息
+        return {
+            'success': True,
+            'processed_path': processed_path,
+            'processed_filename': processed_filename,
+            'processing_info': {
+                'method': '示例处理',
+                'description': '这是一个示例处理结果，实际应用中会进行真实的图片处理',
+                'file_size': os.path.getsize(processed_path)
+            }
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f'图片处理失败: {str(e)}'
         }
 
 @app.route('/api/pdf/upload', methods=['POST'])
@@ -360,6 +412,61 @@ def list_pdfs():
             'error': f'获取文件列表失败: {str(e)}'
         }), 500
 
+# 新增：图片上传API
+@app.route('/api/image/upload', methods=['POST'])
+def upload_image():
+    """
+    上传图片文件
+    """
+    try:
+        if 'file' not in request.files:
+            return jsonify({
+                'success': False,
+                'error': '没有上传文件'
+            }), 400
+
+        file = request.files['file']
+
+        if file.filename == '':
+            return jsonify({
+                'success': False,
+                'error': '未选择文件'
+            }), 400
+
+        if not allowed_image_file(file.filename):
+            return jsonify({
+                'success': False,
+                'error': '只支持图片文件(png, jpg, jpeg, gif, bmp, webp)'
+            }), 400
+
+        # 生成安全的文件名
+        filename = secure_filename(file.filename)
+        unique_filename = f"{uuid.uuid4().hex}_{filename}"
+        file_path = os.path.join(app.config['IMAGE_UPLOAD_FOLDER'], unique_filename)
+
+        # 保存文件
+        file.save(file_path)
+
+        # 获取文件信息
+        file_size = os.path.getsize(file_path)
+
+        return jsonify({
+            'success': True,
+            'message': '图片上传成功',
+            'file_info': {
+                'original_filename': filename,
+                'unique_filename': unique_filename,
+                'file_size': file_size,
+                'file_path': file_path
+            }
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'上传失败: {str(e)}'
+        }), 500
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """
@@ -370,6 +477,81 @@ def health_check():
         'project_root': project_root
     })
 
+# 新增：图片处理API
+@app.route('/api/image/process', methods=['POST'])
+def process_uploaded_image():
+    """
+    处理已上传的图片文件
+    """
+    try:
+        data = request.get_json()
+        print(f"data:{data}")
+        if not data or 'filename' not in data:
+            return jsonify({
+                'success': False,
+                'error': '请提供文件名'
+            }), 400
+
+        filename = data['filename']
+
+        file_path = os.path.join(app.config['IMAGE_UPLOAD_FOLDER'], filename)
+
+        if not os.path.exists(file_path):
+            return jsonify({
+                'success': False,
+                'error': '文件不存在'
+            }), 404
+
+        # 处理图片
+        result = process_image(file_path)
+
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'message': '图片处理完成',
+                'original_file': filename,
+                'processed_file': result['processed_filename'],
+                'processing_info': result['processing_info']
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result['error']
+            }), 500
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'处理失败: {str(e)}'
+        }), 500
+
+# 新增：图片查看API
+@app.route('/api/image/view/<filename>')
+def view_image(filename):
+    """
+    查看图片文件
+    """
+    try:
+        # 检查原始文件
+        original_path = os.path.join(app.config['IMAGE_UPLOAD_FOLDER'], filename)
+        if os.path.exists(original_path):
+            return send_from_directory(app.config['IMAGE_UPLOAD_FOLDER'], filename)
+
+        # 检查处理后的文件
+        processed_path = os.path.join(app.config['IMAGE_PROCESSED_FOLDER'], filename)
+        if os.path.exists(processed_path):
+            return send_from_directory(app.config['IMAGE_PROCESSED_FOLDER'], filename)
+
+        return jsonify({
+            'success': False,
+            'error': '文件不存在'
+        }), 404
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'文件访问错误: {str(e)}'
+        }), 500
 
 @app.errorhandler(404)
 def not_found(error):
@@ -377,7 +559,6 @@ def not_found(error):
         'success': False,
         'error': 'API接口不存在'
     }), 404
-
 
 @app.errorhandler(500)
 def internal_error(error):
@@ -394,5 +575,13 @@ if __name__ == '__main__':
     print(f"API地址: http://localhost:{PORT}/api/markdown")
     print(f"文件服务: http://localhost:{PORT}/api/files/<文件路径>")
     print(f"健康检查: http://localhost:{PORT}/api/health")
+    # 新增：图片API信息
+    print(f"图片上传: http://localhost:{PORT}/api/image/upload")
+    print(f"图片处理: http://localhost:{PORT}/api/image/process")
+    print(f"图片查看: http://localhost:{PORT}/api/image/view/<文件名>")
+    # PDF API信息
+    print(f"PDF上传: http://localhost:{PORT}/api/pdf/upload")
+    print(f"PDF处理: http://localhost:{PORT}/api/pdf/process")
+    print(f"PDF查看: http://localhost:{PORT}/api/pdf/view/<文件名>")
 
     app.run(host='0.0.0.0', port=PORT, debug=True)
