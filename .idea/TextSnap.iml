@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <module type="PYTHON_MODULE" version="4">
   <component name="NewModuleRootManager">
-    <content url="file://$MODULE_DIR$" />
+    <content url="file://$MODULE_DIR$">
+      <excludeFolder url="file://$MODULE_DIR$/data/.cache/huggingface/download" />
+      <excludeFolder url="file://$MODULE_DIR$/data/models" />
+      <excludeFolder url="file://$MODULE_DIR$/flask_react/testsnap-react" />
+      <excludeFolder url="file://$MODULE_DIR$/flask_react/uploads" />
+      <excludeFolder url="file://$MODULE_DIR$/srcProject/output/visualizations" />
+    </content>
     <orderEntry type="jdk" jdkName="textsnap" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
