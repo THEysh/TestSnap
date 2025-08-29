@@ -4,3 +4,6 @@ srcProject/output/visualizations
 configs.yaml
 configs_github.yaml
 .env
+flask_react/testsnap-react
+flask_react/uploads
+flask_react/react

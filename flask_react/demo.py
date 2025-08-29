@@ -236,7 +236,7 @@ with gr.Blocks(theme="ocean", css=css, title='文件转换与预览') as demo:
                                                       container=True, show_download_button=False)
                 with gr.TabItem("markdown"):
                     with gr.Row():
-                        gr.HTML(html_content)
+                        pass
     pdf_input.upload(
         fn=load_file,
         inputs=pdf_input,

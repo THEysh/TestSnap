@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown数学公式渲染器</title>
+    
+    <!-- 引入 Marked.js 用于 Markdown 解析 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true,
+                tags: 'ams'
+            },
+            svg: {
+                fontCache: 'global',
+                scale: 1.1
+            },
+            options: {
+                renderActions: {
+                    findScript: [10, function (doc) {
+                        for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+                            const display = !!node.type.match(/; *mode=display/);
+                            const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+                            const text = document.createTextNode('');
+                            node.parentNode.replaceChild(text, node);
+                            math.start = {node: text, delim: '', n: 0};
+                            math.end = {node: text, delim: '', n: 0};
+                            doc.math.push(math);
+                        }
+                    }, '']
+                }
+            }
+        };
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1500px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            height: 900px;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="%23ffffff22" d="M0,96L48,112C96,128,192,160,288,165.3C384,171,480,149,576,133.3C672,117,768,107,864,122.7C960,139,1056,181,1152,186.7C1248,192,1344,160,1392,144L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>') no-repeat bottom;
+            background-size: cover;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 1em;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .controls {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .path-input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .path-input-group label {
+            color: #667eea;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        #file-path-input {
+            flex: 1;
+            min-width: 300px;
+            padding: 10px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        #file-path-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        #load-button {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        #load-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        #load-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .status-message {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status-loading {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .editor-container {
+            display: flex;
+            height: calc(100vh - 300px);
+            min-height: 500px;
+        }
+
+        .editor-pane, .preview-pane {
+            flex: 1;
+            padding: 30px;
+            overflow: auto;
+        }
+
+        .editor-pane {
+            border-right: 1px solid #e0e0e0;
+            background: #f8f9fa;
+        }
+
+        .editor-pane h2, .preview-pane h2 {
+            margin-bottom: 20px;
+            color: #667eea;
+            font-size: 1.3em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .editor-pane h2::before {
+            content: '✏️';
+        }
+
+        .preview-pane h2::before {
+            content: '👁️';
+        }
+
+        #markdown-input {
+            width: 100%;
+            height: calc(100% - 50px);
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            resize: none;
+            transition: border-color 0.3s;
+            background: white;
+        }
+
+        #markdown-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        #preview {
+            height: calc(100% - 50px);
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            overflow-y: auto;
+        }
+
+        /* Markdown 内容样式 */
+        #preview h1, #preview h2, #preview h3, #preview h4, #preview h5, #preview h6 {
+            margin-top: 24px;
+            margin-bottom: 16px;
+            font-weight: 600;
+            line-height: 1.25;
+            color: #2c3e50;
+        }
+
+        #preview h1 {
+            font-size: 2em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 0.3em;
+        }
+
+        #preview h2 {
+            font-size: 1.5em;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 0.3em;
+        }
+
+        #preview h3 { font-size: 1.25em; }
+        #preview h4 { font-size: 1em; }
+        #preview h5 { font-size: 0.875em; }
+        #preview h6 { font-size: 0.85em; }
+
+        #preview p {
+            margin-bottom: 16px;
+            line-height: 1.8;
+        }
+
+        #preview blockquote {
+            padding: 10px 20px;
+            margin: 0 0 20px;
+            border-left: 4px solid #667eea;
+            background: #f6f8fa;
+            border-radius: 0 8px 8px 0;
+        }
+
+        #preview code {
+            padding: 0.2em 0.4em;
+            background: #f6f8fa;
+            border-radius: 3px;
+            font-size: 85%;
+            color: #d73a49;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+
+        #preview pre {
+            padding: 16px;
+            background: #2d3748;
+            border-radius: 8px;
+            overflow: auto;
+            margin-bottom: 16px;
+        }
+
+        #preview pre code {
+            background: transparent;
+            color: #e2e8f0;
+            padding: 0;
+            font-size: 14px;
+            line-height: 1.45;
+        }
+
+        #preview ul, #preview ol {
+            padding-left: 2em;
+            margin-bottom: 16px;
+        }
+
+        #preview li {
+            margin-bottom: 8px;
+        }
+
+        #preview table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 16px;
+        }
+
+        #preview th, #preview td {
+            padding: 10px 13px;
+            border: 1px solid #d0d7de;
+        }
+
+        #preview th {
+            background: #f6f8fa;
+            font-weight: 600;
+        }
+
+        #preview tr:nth-child(even) {
+            background: #f9fafb;
+        }
+
+        #preview a {
+            color: #667eea;
+            text-decoration: none;
+            border-bottom: 1px dotted #667eea;
+            transition: color 0.3s;
+        }
+
+        #preview a:hover {
+            color: #764ba2;
+            border-bottom-style: solid;
+        }
+
+        #preview hr {
+            height: 2px;
+            padding: 0;
+            margin: 24px 0;
+            background-color: #e0e0e0;
+            border: 0;
+        }
+
+        #preview img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* MathJax 公式样式 */
+        .MathJax, .MathJax_SVG {
+            font-size: 1.1em !important;
+        }
+
+        mjx-container {
+            margin: 10px 0 !important;
+        }
+
+        mjx-container[display="true"] {
+            margin: 20px 0 !important;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .editor-container {
+                flex-direction: column;
+            }
+
+            .editor-pane {
+                border-right: none;
+                border-bottom: 1px solid #e0e0e0;
+            }
+
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .path-input-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            #file-path-input {
+                min-width: auto;
+            }
+        }
+
+        /* 滚动条美化 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Markdown 数学公式渲染器</h1>
+            <p>支持 LaTeX 数学公式的实时 Markdown 渲染</p>
+        </div>
+
+        <div class="controls">
+            <div class="path-input-group">
+                <label for="file-path-input">文件路径:</label>
+                <input
+                    type="text"
+                    id="file-path-input"
+                    placeholder="例如: srcProject/output/gae/gae.md"
+                    value="srcProject/output/gae/gae.md"
+                >
+                <button id="load-button">加载文件</button>
+            </div>
+            <div id="status-message" class="status-message"></div>
+        </div>
+
+        <div class="editor-container">
+            <div class="editor-pane">
+                <h2>Markdown 内容</h2>
+                <textarea id="markdown-input" placeholder="在上方输入文件路径并点击加载，或直接在此处编辑Markdown内容..."></textarea>
+            </div>
+            <div class="preview-pane">
+                <h2>渲染预览</h2>
+                <div id="preview"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:7861/api';
+
+        const markdownInput = document.getElementById('markdown-input');
+        const filePathInput = document.getElementById('file-path-input');
+        const loadButton = document.getElementById('load-button');
+        const statusMessage = document.getElementById('status-message');
+
+        // 当前加载的文件目录，用于处理相对路径图片
+        let currentFileDir = '';
+        let apiBaseUrl = '';
+
+        // 配置 marked
+        const renderer = new marked.Renderer();
+        marked.setOptions({
+            renderer: renderer,
+            highlight: function(code, lang) {
+                return code;
+            },
+            pedantic: false,
+            gfm: true,
+            breaks: true,
+            sanitize: false,
+            smartLists: true,
+            smartypants: false,
+            xhtml: false
+        });
+
+        // 显示状态消息
+        function showStatus(message, type = 'info') {
+            statusMessage.textContent = message;
+            statusMessage.className = `status-message status-${type}`;
+            statusMessage.style.display = 'block';
+
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusMessage.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        // 隐藏状态消息
+        function hideStatus() {
+            statusMessage.style.display = 'none';
+        }
+
+        // 更新图片路径，使其指向Flask API
+        function updateImagePaths(markdownContent, baseDir, apiUrl) {
+            const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+            return markdownContent.replace(imgRegex, (match, alt, path) => {
+                // 检查路径是否已经是绝对路径或包含 http
+                if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('/api/')) {
+                    return match;
+                }
+
+                // 构建通过API访问的路径
+                let newPath;
+                if (baseDir && !path.startsWith('./') && !path.startsWith('../')) {
+                    // 相对于Markdown文件的路径
+                    newPath = `${apiUrl}/${baseDir}/${path}`;
+                } else if (path.startsWith('./')) {
+                    // 当前目录相对路径
+                    newPath = `${apiUrl}/${baseDir}/${path.substring(2)}`;
+                } else if (path.startsWith('../')) {
+                    // 上级目录相对路径，需要更复杂的处理
+                    const pathParts = baseDir.split('/').filter(p => p);
+                    const relativeParts = path.split('/').filter(p => p);
+
+                    // 处理 ../
+                    let upLevels = 0;
+                    for (let part of relativeParts) {
+                        if (part === '..') {
+                            upLevels++;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    // 构建新路径
+                    const remainingPath = relativeParts.slice(upLevels).join('/');
+                    const newBasePath = pathParts.slice(0, -upLevels).join('/');
+                    newPath = `${apiUrl}/${newBasePath ? newBasePath + '/' : ''}${remainingPath}`;
+                } else {
+                    // 绝对路径（相对于项目根目录）
+                    newPath = `${apiUrl}/${path}`;
+                }
+
+                return `![${alt}](${newPath})`;
+            });
+        }
+
+        // 渲染Markdown
+        function renderMarkdown(input) {
+            const preview = document.getElementById('preview');
+
+            // 保护数学公式不被 Markdown 解析器处理
+            let tempStorage = [];
+            let tempIndex = 0;
+
+            // 保护块级公式
+            let protectedInput = input.replace(/\$\$[\s\S]*?\$\$/g, function(match) {
+                const placeholder = `MATH_BLOCK_${tempIndex}`;
+                tempStorage[tempIndex] = match;
+                tempIndex++;
+                return placeholder;
+            });
+
+            // 保护行内公式
+            protectedInput = protectedInput.replace(/\$(?!\$)([^\$\n]+?)\$/g, function(match) {
+                const placeholder = `MATH_INLINE_${tempIndex}`;
+                tempStorage[tempIndex] = match;
+                tempIndex++;
+                return placeholder;
+            });
+
+            // 使用 marked 解析 Markdown
+            let html = marked.parse(protectedInput);
+
+            // 恢复数学公式
+            html = html.replace(/MATH_BLOCK_(\d+)/g, function(match, index) {
+                return tempStorage[parseInt(index)];
+            });
+
+            html = html.replace(/MATH_INLINE_(\d+)/g, function(match, index) {
+                return tempStorage[parseInt(index)];
+            });
+
+            // 更新预览
+            preview.innerHTML = html;
+
+            // 触发 MathJax 重新渲染
+            if (window.MathJax) {
+                MathJax.typesetPromise([preview]).catch(function(err) {
+                    console.log('MathJax 渲染错误: ', err);
+                });
+            }
+        }
+
+        // 防抖函数
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // 从后端加载Markdown文件
+        async function loadMarkdownFile(filePath) {
+            if (!filePath.trim()) {
+                showStatus('请输入文件路径', 'error');
+                return;
+            }
+
+            try {
+                loadButton.disabled = true;
+                showStatus('正在加载文件...', 'loading');
+
+                const response = await fetch(`${API_BASE_URL}/markdown`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        path: filePath
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    currentFileDir = result.file_dir;
+                    apiBaseUrl = result.api_base_url;
+
+                    // 处理图片路径并更新内容
+                    const updatedContent = updateImagePaths(result.content, currentFileDir, apiBaseUrl);
+
+                    markdownInput.value = updatedContent;
+                    renderMarkdown(updatedContent);
+
+                    showStatus(`文件加载成功: ${result.file_path}`, 'success');
+                } else {
+                    showStatus(`加载失败: ${result.error}`, 'error');
+                }
+
+            } catch (error) {
+                console.error('请求失败:', error);
+                showStatus('网络请求失败，请检查服务器是否启动', 'error');
+            } finally {
+                loadButton.disabled = false;
+            }
+        }
+
+        // 添加事件监听器
+        const debouncedRender = debounce(() => {
+            renderMarkdown(markdownInput.value);
+        }, 300);
+
+        markdownInput.addEventListener('input', debouncedRender);
+
+        loadButton.addEventListener('click', () => {
+            const filePath = filePathInput.value.trim();
+            loadMarkdownFile(filePath);
+        });
+
+        // 支持回车键加载文件
+        filePathInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const filePath = filePathInput.value.trim();
+                loadMarkdownFile(filePath);
+            }
+        });
+
+        // 页面加载完成后自动加载默认文件
+        window.addEventListener('load', () => {
+            const defaultPath = filePathInput.value.trim();
+            if (defaultPath) {
+                loadMarkdownFile(defaultPath);
+            }
+        });
+
+        // 初始渲染
+        renderMarkdown(markdownInput.value);
+
+        // 在 markdown.html 的 JavaScript 中添加这段代码
+
+        // 实时向父页面发送当前文档的高度
+        function sendHeight() {
+            const body = document.body;
+            const html = document.documentElement;
+
+            // 获取文档的实际可滚动高度
+            const height = Math.max(
+                body.scrollHeight, body.offsetHeight,
+                html.clientHeight, html.scrollHeight, html.offsetHeight
+            );
+
+            // 使用 postMessage 将高度发送给父页面
+            window.parent.postMessage({
+                height: height,
+                source: 'markdown-iframe'
+            }, '*'); // '*' 表示不限制域名，实际应用中应指定父页面的域名以提高安全性
+        }
+
+        // 首次加载和内容变化时发送高度
+        window.addEventListener('load', sendHeight);
+        markdownInput.addEventListener('input', sendHeight); // 当用户编辑时
+        loadButton.addEventListener('click', () => {
+            // 异步加载文件后，在渲染完成后再发送高度
+            setTimeout(sendHeight, 500);
+        });
+
+        // 监听 MathJax 渲染完成事件
+        // MathJax 在渲染完成后会改变 DOM 结构，需要重新计算高度
+        if (window.MathJax) {
+            MathJax.startup.promise.then(() => {
+                sendHeight();
+                // 监听后续排版完成事件
+                MathJax.typesetPromise().then(() => {
+                    sendHeight();
+                });
+            });
+        }
+    </script>
+</body>
+</html>
