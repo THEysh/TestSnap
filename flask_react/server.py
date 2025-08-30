@@ -25,10 +25,9 @@ mimetypes.add_type('image/svg+xml', '.svg')
 
 # 配置上传文件夹
 UPLOAD_FOLDER = os.path.join(project_root, 'srcProject/output/visualizations/uploads', 'pdfs')
-PROCESSED_FOLDER = os.path.join(project_root, 'srcProject/output/visualizations/uploads', 'processed')
 # 新增：图片上传配置
 IMAGE_UPLOAD_FOLDER = os.path.join(project_root, 'srcProject/output/visualizations/uploads', 'images')
-IMAGE_PROCESSED_FOLDER = PROCESSED_FOLDER
+
 # 允许的文件类型
 ALLOWED_EXTENSIONS = {'pdf'}
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'}
@@ -37,14 +36,12 @@ ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'}
 FILE_TYPE_CONFIG = {
     'pdf': {
         'upload_folder': UPLOAD_FOLDER,
-        'processed_folder': PROCESSED_FOLDER,
         'allowed_extensions': ALLOWED_EXTENSIONS,
         'process_func': lambda path: process_pdf_image(path),
         'success_message': 'PDF处理完成'
     },
     'image': {
         'upload_folder': IMAGE_UPLOAD_FOLDER,
-        'processed_folder': IMAGE_PROCESSED_FOLDER,
         'allowed_extensions': ALLOWED_IMAGE_EXTENSIONS,
         'process_func': lambda path: process_pdf_image(path),
         'success_message': '图片处理完成'
@@ -53,14 +50,9 @@ FILE_TYPE_CONFIG = {
 
 # 确保上传目录存在
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 os.makedirs(IMAGE_UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(IMAGE_PROCESSED_FOLDER, exist_ok=True)
-
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['PROCESSED_FOLDER'] = PROCESSED_FOLDER
 app.config['IMAGE_UPLOAD_FOLDER'] = IMAGE_UPLOAD_FOLDER
-app.config['IMAGE_PROCESSED_FOLDER'] = IMAGE_PROCESSED_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
 @app.route('/api/markdown', methods=['POST'])
 def get_markdown():
@@ -207,16 +199,14 @@ def upload_file(file, file_type):
         config = FILE_TYPE_CONFIG.get(file_type)
         if not config:
             return {'success': False, 'error': f'不支持的文件类型: {file_type}'}
-            
         # 验证文件类型
         _, ext = os.path.splitext(file.filename.lower())
         if ext[1:] not in config['allowed_extensions']:
             supported = ', '.join(config['allowed_extensions'])
             return {'success': False, 'error': f'只支持以下文件类型: {supported}'}
-            
         # 生成安全的文件名
         filename = secure_filename(file.filename)
-        unique_filename = f"{uuid.uuid4().hex}_{filename}"
+        unique_filename = f"{uuid.uuid4().hex[:4]}_{filename}"
         file_path = os.path.join(config['upload_folder'], unique_filename)
         
         # 确保上传目录存在
@@ -274,7 +264,8 @@ def process_file(filename, file_type):
                 'message': config['success_message'],
                 'original_file': filename,
                 'processed_file': result['processed_filename'],
-                'processing_info': result['processing_info']
+                'processing_info': result['processing_info'],
+                'md_path': result['md_path']
             }
         else:
             return {'success': False, 'error': result['error']}
@@ -334,6 +325,7 @@ def process_pdf_image(file_path):
             }
         # 转为相对目录
         visualize_relative_path = to_relative_path(visualize_path)
+        md_relative_path = to_relative_path(md_save_path)
         # 使用相对路径作为processed_filename，这样前端就能正确构建URL
         processed_filename = visualize_relative_path
         logger.info(f"PDF处理完成: {visualize_relative_path}")
@@ -342,6 +334,7 @@ def process_pdf_image(file_path):
             'success': True,
             'processed_path': visualize_relative_path,
             'processed_filename': processed_filename,
+            'md_path': md_relative_path,
             'processing_info': {
                 'method': '示例处理',
                 'description': '这是一个示例处理结果，实际应用中会进行真实的PDF处理',
@@ -395,50 +388,6 @@ def process_uploaded_pdf():
             'error': f'处理失败: {str(e)}'
         }), 500
 
-@app.route('/api/pdf/get_result', methods=['GET'])
-def get_pdf_result():
-    """
-    根据任务ID获取PDF处理结果
-    """
-    try:
-        task_id = request.args.get('task_id')
-        if not task_id:
-            return jsonify({'success': False, 'error': '缺少任务ID参数'}), 400
-        
-        # 这里应该根据task_id查询最终的处理结果
-        # 由于我们现在是示例实现，这里返回一个模拟的成功结果
-        # 在实际应用中，应该从数据库或文件系统中查询真实的处理结果
-        return jsonify({
-            'success': True,
-            'message': 'PDF处理完成',
-            'processed_file': 'srcProject/output/visualizations/sample.pdf'  # 示例路径，实际应从任务记录中获取
-        }), 200
-    except Exception as e:
-        logger.error(f"获取PDF处理结果异常: {str(e)}")
-        return jsonify({'success': False, 'error': f'获取结果失败: {str(e)}'}), 500
-
-@app.route('/api/image/get_result', methods=['GET'])
-def get_image_result():
-    """
-    根据任务ID获取图片处理结果
-    """
-    try:
-        task_id = request.args.get('task_id')
-        if not task_id:
-            return jsonify({'success': False, 'error': '缺少任务ID参数'}), 400
-        
-        # 这里应该根据task_id查询最终的处理结果
-        # 由于我们现在是示例实现，这里返回一个模拟的成功结果
-        # 在实际应用中，应该从数据库或文件系统中查询真实的处理结果
-        return jsonify({
-            'success': True,
-            'message': '图片处理完成',
-            'processed_file': 'srcProject/output/visualizations/sample.png'  # 示例路径，实际应从任务记录中获取
-        }), 200
-    except Exception as e:
-        logger.error(f"获取图片处理结果异常: {str(e)}")
-        return jsonify({'success': False, 'error': f'获取结果失败: {str(e)}'}), 500
-
 @app.route('/api/pdf/view/<filename>')
 def view_pdf(filename):
     """
@@ -471,16 +420,6 @@ def list_pdfs():
                         'modified': os.path.getmtime(file_path)
                     })
 
-        # 获取处理后文件列表
-        if os.path.exists(app.config['PROCESSED_FOLDER']):
-            for filename in os.listdir(app.config['PROCESSED_FOLDER']):
-                if filename.endswith('.pdf'):
-                    file_path = os.path.join(app.config['PROCESSED_FOLDER'], filename)
-                    processed_files.append({
-                        'filename': filename,
-                        'size': os.path.getsize(file_path),
-                        'modified': os.path.getmtime(file_path)
-                    })
 
         return jsonify({
             'success': True,
