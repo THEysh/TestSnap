@@ -1,12 +1,18 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, Response
 from flask_cors import CORS
 import os
 import mimetypes
 import shutil
-from pathlib import Path
-from srcProject.utlis.common import find_project_root
+import logging
+from srcProject.main_process_sequence import main
+from srcProject.models.model_manager import ModelManager
+from srcProject.utlis.common import find_project_root, to_relative_path
 from werkzeug.utils import secure_filename
 import uuid
+
+# 配置日志
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger('TextSnapServer')
 app = Flask(__name__)
 CORS(app)  # 允许跨域请求
 
@@ -18,14 +24,32 @@ mimetypes.add_type('image/webp', '.webp')
 mimetypes.add_type('image/svg+xml', '.svg')
 
 # 配置上传文件夹
-UPLOAD_FOLDER = os.path.join(project_root, 'flask_react/uploads', 'pdfs')
-PROCESSED_FOLDER = os.path.join(project_root, 'flask_react/uploads', 'processed')
+UPLOAD_FOLDER = os.path.join(project_root, 'srcProject/output/visualizations/uploads', 'pdfs')
+PROCESSED_FOLDER = os.path.join(project_root, 'srcProject/output/visualizations/uploads', 'processed')
 # 新增：图片上传配置
-IMAGE_UPLOAD_FOLDER = os.path.join(project_root, 'flask_react/uploads', 'images')
-IMAGE_PROCESSED_FOLDER = os.path.join(project_root, 'flask_react/uploads', 'processed_images')
+IMAGE_UPLOAD_FOLDER = os.path.join(project_root, 'srcProject/output/visualizations/uploads', 'images')
+IMAGE_PROCESSED_FOLDER = PROCESSED_FOLDER
 # 允许的文件类型
 ALLOWED_EXTENSIONS = {'pdf'}
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'}
+
+# 定义文件类型配置映射
+FILE_TYPE_CONFIG = {
+    'pdf': {
+        'upload_folder': UPLOAD_FOLDER,
+        'processed_folder': PROCESSED_FOLDER,
+        'allowed_extensions': ALLOWED_EXTENSIONS,
+        'process_func': lambda path: process_pdf_image(path),
+        'success_message': 'PDF处理完成'
+    },
+    'image': {
+        'upload_folder': IMAGE_UPLOAD_FOLDER,
+        'processed_folder': IMAGE_PROCESSED_FOLDER,
+        'allowed_extensions': ALLOWED_IMAGE_EXTENSIONS,
+        'process_func': lambda path: process_pdf_image(path),
+        'success_message': '图片处理完成'
+    }
+}
 
 # 确保上传目录存在
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -161,15 +185,139 @@ def serve_file(filename):
             'error': f'文件服务错误: {str(e)}'
         }), 500
 
-
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def allowed_image_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
 
+# 通用文件上传函数
+def upload_file(file, file_type):
+    """
+    通用文件上传函数
+    :param file: 上传的文件对象
+    :param file_type: 文件类型 ('pdf' 或 'image')
+    :return: 包含上传结果的字典
+    """
+    try:
+        if not file or file.filename == '':
+            return {'success': False, 'error': '未选择文件'}
+            
+        # 获取文件类型配置
+        config = FILE_TYPE_CONFIG.get(file_type)
+        if not config:
+            return {'success': False, 'error': f'不支持的文件类型: {file_type}'}
+            
+        # 验证文件类型
+        _, ext = os.path.splitext(file.filename.lower())
+        if ext[1:] not in config['allowed_extensions']:
+            supported = ', '.join(config['allowed_extensions'])
+            return {'success': False, 'error': f'只支持以下文件类型: {supported}'}
+            
+        # 生成安全的文件名
+        filename = secure_filename(file.filename)
+        unique_filename = f"{uuid.uuid4().hex}_{filename}"
+        file_path = os.path.join(config['upload_folder'], unique_filename)
+        
+        # 确保上传目录存在
+        os.makedirs(config['upload_folder'], exist_ok=True)
+        
+        # 保存文件
+        file.save(file_path)
+        logger.info(f"已上传{file_type}文件: {filename} 至 {file_path}")
+        
+        # 获取文件信息
+        file_size = os.path.getsize(file_path)
+        
+        return {
+            'success': True,
+            'message': f'{file_type}文件上传成功',
+            'file_info': {
+                'original_filename': filename,
+                'unique_filename': unique_filename,
+                'file_size': file_size,
+                'file_path': file_path
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"{file_type}文件上传失败: {str(e)}")
+        return {'success': False, 'error': f'上传失败: {str(e)}'}
 
-def process_pdf(file_path):
+# 通用文件处理函数
+def process_file(filename, file_type):
+    """
+    通用文件处理函数
+    :param filename: 文件名
+    :param file_type: 文件类型 ('pdf' 或 'image')
+    :return: 包含处理结果的字典
+    """
+    try:
+        # 获取文件类型配置
+        config = FILE_TYPE_CONFIG.get(file_type)
+        if not config:
+            return {'success': False, 'error': f'不支持的文件类型: {file_type}'}
+            
+        # 构建文件路径
+        file_path = os.path.join(config['upload_folder'], filename)
+        
+        # 检查文件是否存在
+        if not os.path.exists(file_path):
+            return {'success': False, 'error': '文件不存在'}\
+            
+        # 处理文件
+        result = config['process_func'](file_path)
+        
+        if result['success']:
+            return {
+                'success': True,
+                'message': config['success_message'],
+                'original_file': filename,
+                'processed_file': result['processed_filename'],
+                'processing_info': result['processing_info']
+            }
+        else:
+            return {'success': False, 'error': result['error']}
+            
+    except Exception as e:
+        logger.error(f"{file_type}文件处理失败: {str(e)}")
+        return {'success': False, 'error': f'处理失败: {str(e)}'}
+
+# 通用文件查看函数
+def view_file(filename, file_type):
+    """
+    通用文件查看函数
+    :param filename: 文件名或相对路径
+    :param file_type: 文件类型 ('pdf' 或 'image')
+    :return: Flask响应对象或错误信息
+    """
+    try:
+        # 获取文件类型配置
+        config = FILE_TYPE_CONFIG.get(file_type)
+        if not config:
+            return None, {'success': False, 'error': f'不支持的文件类型: {file_type}'}
+
+        # 检查原始文件
+        original_path = os.path.join(config['upload_folder'], filename)
+        if os.path.exists(original_path):
+            return send_from_directory(config['upload_folder'], filename), None
+            
+        # 新增：检查相对路径的文件（用于处理后的PDF文件）
+        relative_full_path = os.path.join(project_root, filename)
+        if os.path.exists(relative_full_path):
+            # 获取目录和文件名
+            directory = os.path.dirname(relative_full_path)
+            file_name = os.path.basename(relative_full_path)
+            return send_from_directory(directory, file_name), None
+            
+        logger.warning(f"文件不存在: {filename}, 类型: {file_type}")
+        return None, {'success': False, 'error': '文件不存在'}
+        
+    except Exception as e:
+        logger.error(f"{file_type}文件查看失败: {str(e)}")
+        return None, {'success': False, 'error': f'文件访问错误: {str(e)}'}
+
+def process_pdf_image(file_path):
     """
     处理PDF文件 - 这里可以添加你的PDF处理逻辑
     例如：OCR、文本提取、图片提取、格式转换等
@@ -177,67 +325,34 @@ def process_pdf(file_path):
     """
     try:
         # 生成处理后的文件名
-        filename = os.path.basename(file_path)
-        name, ext = os.path.splitext(filename)
-        processed_filename = f"{name}_processed{ext}"
-        processed_filename = "9f06569d4e48487796978c4fcc970ad9_processed.pdf"
-        processed_path = os.path.join(app.config['PROCESSED_FOLDER'], processed_filename)
-        # 这里可以添加实际的PDF处理逻辑
-
-        print(f"process, ")
+        md_save_path, visualize_path = main(file_path)
+        is_processed_file_exists = os.path.isfile(visualize_path)
+        if not is_processed_file_exists:
+            return {
+                'success': False,
+                'error': f'PDF路径不存在，处理失败'
+            }
+        # 转为相对目录
+        visualize_relative_path = to_relative_path(visualize_path)
+        # 使用相对路径作为processed_filename，这样前端就能正确构建URL
+        processed_filename = visualize_relative_path
+        logger.info(f"PDF处理完成: {visualize_relative_path}")
         # 返回处理结果信息
         return {
             'success': True,
-            'processed_path': processed_path,
+            'processed_path': visualize_relative_path,
             'processed_filename': processed_filename,
             'processing_info': {
                 'method': '示例处理',
                 'description': '这是一个示例处理结果，实际应用中会进行真实的PDF处理',
-                'file_size': os.path.getsize(processed_path)
+                'file_size': os.path.getsize(visualize_path)
             }
         }
 
     except Exception as e:
         return {
             'success': False,
-            'error': f'PDF处理失败: {str(e)}'
-        }
-
-def process_image(file_path):
-    """
-    处理图片文件 - 这里可以添加你的图片处理逻辑
-    例如：调整大小、压缩、滤镜效果、格式转换等
-    目前作为示例，我们简单复制文件并添加处理标记
-    """
-    try:
-        # 生成处理后的文件名
-        filename = os.path.basename(file_path)
-        name, ext = os.path.splitext(filename)
-        processed_filename = f"{name}_processed{ext}"
-        processed_path = os.path.join(app.config['IMAGE_PROCESSED_FOLDER'], processed_filename)
-        
-        # 这里可以添加实际的图片处理逻辑
-        # 作为示例，我们只是复制文件
-        import shutil
-        shutil.copy2(file_path, processed_path)
-        
-        print(f"图片处理完成: {processed_filename}")
-        # 返回处理结果信息
-        return {
-            'success': True,
-            'processed_path': processed_path,
-            'processed_filename': processed_filename,
-            'processing_info': {
-                'method': '示例处理',
-                'description': '这是一个示例处理结果，实际应用中会进行真实的图片处理',
-                'file_size': os.path.getsize(processed_path)
-            }
-        }
-
-    except Exception as e:
-        return {
-            'success': False,
-            'error': f'图片处理失败: {str(e)}'
+            'error': f'处理失败: {str(e)}'
         }
 
 @app.route('/api/pdf/upload', methods=['POST'])
@@ -245,54 +360,15 @@ def upload_pdf():
     """
     上传PDF文件
     """
-    try:
-        if 'file' not in request.files:
-            return jsonify({
-                'success': False,
-                'error': '没有上传文件'
-            }), 400
-
-        file = request.files['file']
-
-        if file.filename == '':
-            return jsonify({
-                'success': False,
-                'error': '未选择文件'
-            }), 400
-
-        if not allowed_file(file.filename):
-            return jsonify({
-                'success': False,
-                'error': '只支持PDF文件'
-            }), 400
-
-        # 生成安全的文件名
-        filename = secure_filename(file.filename)
-        unique_filename = f"{uuid.uuid4().hex}_{filename}"
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-
-        # 保存文件
-        file.save(file_path)
-
-        # 获取文件信息
-        file_size = os.path.getsize(file_path)
-
-        return jsonify({
-            'success': True,
-            'message': '文件上传成功',
-            'file_info': {
-                'original_filename': filename,
-                'unique_filename': unique_filename,
-                'file_size': file_size,
-                'file_path': file_path
-            }
-        })
-
-    except Exception as e:
+    if 'file' not in request.files:
         return jsonify({
             'success': False,
-            'error': f'上传失败: {str(e)}'
-        }), 500
+            'error': '没有上传文件'
+        }), 400
+    
+    result = upload_file(request.files['file'], 'pdf')
+    status_code = 200 if result['success'] else 400 if 'error' in result and '未选择文件' in result['error'] else 500
+    return jsonify(result), status_code
 
 @app.route('/api/pdf/process', methods=['POST'])
 def process_uploaded_pdf():
@@ -301,73 +377,79 @@ def process_uploaded_pdf():
     """
     try:
         data = request.get_json()
-        print(f"data:{data}")
+        logger.info(f"接收到PDF处理请求: {data}")
         if not data or 'filename' not in data:
             return jsonify({
                 'success': False,
                 'error': '请提供文件名'
             }), 400
-
-        filename = data['filename']
-
-
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-
-        if not os.path.exists(file_path):
-            return jsonify({
-                'success': False,
-                'error': '文件不存在'
-            }), 404
-
-        # 处理PDF
-        result = process_pdf(file_path)
-
-        if result['success']:
-            return jsonify({
-                'success': True,
-                'message': 'PDF处理完成',
-                'original_file': filename,
-                'processed_file': result['processed_filename'],
-                'processing_info': result['processing_info']
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'error': result['error']
-            }), 500
-
+        
+        result = process_file(data['filename'], 'pdf')
+        status_code = 200 if result['success'] else 400 if 'error' in result and ('未选择文件' in result['error'] or '请提供文件名' in result['error']) else 404 if 'error' in result and '文件不存在' in result['error'] else 500
+        return jsonify(result), status_code
+        
     except Exception as e:
+        logger.error(f"PDF处理请求异常: {str(e)}")
         return jsonify({
             'success': False,
             'error': f'处理失败: {str(e)}'
         }), 500
+
+@app.route('/api/pdf/get_result', methods=['GET'])
+def get_pdf_result():
+    """
+    根据任务ID获取PDF处理结果
+    """
+    try:
+        task_id = request.args.get('task_id')
+        if not task_id:
+            return jsonify({'success': False, 'error': '缺少任务ID参数'}), 400
+        
+        # 这里应该根据task_id查询最终的处理结果
+        # 由于我们现在是示例实现，这里返回一个模拟的成功结果
+        # 在实际应用中，应该从数据库或文件系统中查询真实的处理结果
+        return jsonify({
+            'success': True,
+            'message': 'PDF处理完成',
+            'processed_file': 'srcProject/output/visualizations/sample.pdf'  # 示例路径，实际应从任务记录中获取
+        }), 200
+    except Exception as e:
+        logger.error(f"获取PDF处理结果异常: {str(e)}")
+        return jsonify({'success': False, 'error': f'获取结果失败: {str(e)}'}), 500
+
+@app.route('/api/image/get_result', methods=['GET'])
+def get_image_result():
+    """
+    根据任务ID获取图片处理结果
+    """
+    try:
+        task_id = request.args.get('task_id')
+        if not task_id:
+            return jsonify({'success': False, 'error': '缺少任务ID参数'}), 400
+        
+        # 这里应该根据task_id查询最终的处理结果
+        # 由于我们现在是示例实现，这里返回一个模拟的成功结果
+        # 在实际应用中，应该从数据库或文件系统中查询真实的处理结果
+        return jsonify({
+            'success': True,
+            'message': '图片处理完成',
+            'processed_file': 'srcProject/output/visualizations/sample.png'  # 示例路径，实际应从任务记录中获取
+        }), 200
+    except Exception as e:
+        logger.error(f"获取图片处理结果异常: {str(e)}")
+        return jsonify({'success': False, 'error': f'获取结果失败: {str(e)}'}), 500
 
 @app.route('/api/pdf/view/<filename>')
 def view_pdf(filename):
     """
     查看PDF文件
     """
-    try:
-        # 检查原始文件
-        original_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        if os.path.exists(original_path):
-            return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-
-        # 检查处理后的文件
-        processed_path = os.path.join(app.config['PROCESSED_FOLDER'], filename)
-        if os.path.exists(processed_path):
-            return send_from_directory(app.config['PROCESSED_FOLDER'], filename)
-
-        return jsonify({
-            'success': False,
-            'error': '文件不存在'
-        }), 404
-
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'文件访问错误: {str(e)}'
-        }), 500
+    logger.info(f"请求查看PDF文件: {filename}")
+    response, error = view_file(filename, 'pdf')
+    if error:
+        status_code = 404 if error['error'] == '文件不存在' else 500
+        return jsonify(error), status_code
+    return response
 
 @app.route('/api/pdf/list', methods=['GET'])
 def list_pdfs():
@@ -418,54 +500,15 @@ def upload_image():
     """
     上传图片文件
     """
-    try:
-        if 'file' not in request.files:
-            return jsonify({
-                'success': False,
-                'error': '没有上传文件'
-            }), 400
-
-        file = request.files['file']
-
-        if file.filename == '':
-            return jsonify({
-                'success': False,
-                'error': '未选择文件'
-            }), 400
-
-        if not allowed_image_file(file.filename):
-            return jsonify({
-                'success': False,
-                'error': '只支持图片文件(png, jpg, jpeg, gif, bmp, webp)'
-            }), 400
-
-        # 生成安全的文件名
-        filename = secure_filename(file.filename)
-        unique_filename = f"{uuid.uuid4().hex}_{filename}"
-        file_path = os.path.join(app.config['IMAGE_UPLOAD_FOLDER'], unique_filename)
-
-        # 保存文件
-        file.save(file_path)
-
-        # 获取文件信息
-        file_size = os.path.getsize(file_path)
-
-        return jsonify({
-            'success': True,
-            'message': '图片上传成功',
-            'file_info': {
-                'original_filename': filename,
-                'unique_filename': unique_filename,
-                'file_size': file_size,
-                'file_path': file_path
-            }
-        })
-
-    except Exception as e:
+    if 'file' not in request.files:
         return jsonify({
             'success': False,
-            'error': f'上传失败: {str(e)}'
-        }), 500
+            'error': '没有上传文件'
+        }), 400
+    
+    result = upload_file(request.files['file'], 'image')
+    status_code = 200 if result['success'] else 400 if 'error' in result and '未选择文件' in result['error'] else 500
+    return jsonify(result), status_code
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
@@ -485,41 +528,19 @@ def process_uploaded_image():
     """
     try:
         data = request.get_json()
-        print(f"data:{data}")
+        logger.info(f"接收到图片处理请求: {data}")
         if not data or 'filename' not in data:
             return jsonify({
                 'success': False,
                 'error': '请提供文件名'
             }), 400
-
-        filename = data['filename']
-
-        file_path = os.path.join(app.config['IMAGE_UPLOAD_FOLDER'], filename)
-
-        if not os.path.exists(file_path):
-            return jsonify({
-                'success': False,
-                'error': '文件不存在'
-            }), 404
-
-        # 处理图片
-        result = process_image(file_path)
-
-        if result['success']:
-            return jsonify({
-                'success': True,
-                'message': '图片处理完成',
-                'original_file': filename,
-                'processed_file': result['processed_filename'],
-                'processing_info': result['processing_info']
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'error': result['error']
-            }), 500
-
+        
+        result = process_file(data['filename'], 'image')
+        status_code = 200 if result['success'] else 400 if 'error' in result and ('未选择文件' in result['error'] or '请提供文件名' in result['error']) else 404 if 'error' in result and '文件不存在' in result['error'] else 500
+        return jsonify(result), status_code
+        
     except Exception as e:
+        logger.error(f"图片处理请求异常: {str(e)}")
         return jsonify({
             'success': False,
             'error': f'处理失败: {str(e)}'
@@ -531,27 +552,12 @@ def view_image(filename):
     """
     查看图片文件
     """
-    try:
-        # 检查原始文件
-        original_path = os.path.join(app.config['IMAGE_UPLOAD_FOLDER'], filename)
-        if os.path.exists(original_path):
-            return send_from_directory(app.config['IMAGE_UPLOAD_FOLDER'], filename)
-
-        # 检查处理后的文件
-        processed_path = os.path.join(app.config['IMAGE_PROCESSED_FOLDER'], filename)
-        if os.path.exists(processed_path):
-            return send_from_directory(app.config['IMAGE_PROCESSED_FOLDER'], filename)
-
-        return jsonify({
-            'success': False,
-            'error': '文件不存在'
-        }), 404
-
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'文件访问错误: {str(e)}'
-        }), 500
+    logger.info(f"请求查看图片文件: {filename}")
+    response, error = view_file(filename, 'image')
+    if error:
+        status_code = 404 if error['error'] == '文件不存在' else 500
+        return jsonify(error), status_code
+    return response
 
 @app.errorhandler(404)
 def not_found(error):
@@ -569,6 +575,7 @@ def internal_error(error):
 
 
 if __name__ == '__main__':
+
     PORT = 7861
     print(f"Flask服务器启动在端口: {PORT}")
     print(f"项目根目录: {project_root}")

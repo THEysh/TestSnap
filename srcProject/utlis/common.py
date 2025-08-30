@@ -18,6 +18,12 @@ def find_project_root(marker_file: str = 'requirements.txt') -> Path:
         # 向上移动一级
         current_dir = current_dir.parent
 
+def to_relative_path(abs_path: str) -> str:
+    """
+    把绝对路径转换成相对项目根目录的路径
+    """
+    project_root = find_project_root()
+    return os.path.relpath(abs_path, start=project_root)
 
 def get_key_by_value(dictionary, value):
     """

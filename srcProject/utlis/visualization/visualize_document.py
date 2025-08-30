@@ -88,8 +88,10 @@ def visualize_document(
                 combined_doc.save(combined_pdf_path, garbage=4, deflate=True)
                 combined_doc.close()
                 print(f"合并后的 PDF 已保存至 {combined_pdf_path}")
+                return combined_pdf_path   # ✅ 返回合并后的 PDF 路径
             except Exception as e:
-                ValueError(f"合并 PDF 失败: {e}")
+                raise ValueError(f"合并 PDF 失败: {e}")
+        return None
 
     elif file_extension in ['.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff']:
         if not detections_per_page:
@@ -139,8 +141,11 @@ def visualize_document(
             )
         try:
             drawable_image.save(image_output_path)
-            print(f"绘制后的图片已保存到: {image_output_path}")
+            print(f"可视化的图片已保存到: {image_output_path}")
+            return image_output_path  # ✅ 返回处理后的图片路径
         except Exception as e:
             print(f"保存图片失败: {e}")
+            return None
     else:
         print(f"不支持的可视化文件类型: {file_extension}")
+        return None

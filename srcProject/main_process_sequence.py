@@ -165,7 +165,7 @@ def main(path):
     file_name_without_extension, file_extension = os.path.splitext(os.path.basename(sample_path))
     detections = asyncio.run(layout_prediction(sample_path, bool_ocr=True))
     page_order = read_prediction(detections)
-    visualize_document(
+    visualize_path = visualize_document(
         input_path=sample_path,  # 传入原始输入路径
         detections_per_page=detections,
         category_names=model_manager.layout_category_names,
@@ -175,7 +175,7 @@ def main(path):
     )
     md_save_path = os.path.join(find_project_root(), f"srcProject/output/visualizations/{file_name_without_extension}", f"{file_name_without_extension}.md")
     generate_markdown_document(detections,page_order,output_path= md_save_path)
-    return md_save_path
+    return md_save_path, visualize_path
 if __name__ == '__main__':
     # "tests/test_data/多智能体强化学习综述.pdf"
     main('tests/test_data/demo1_页面_3.png')
