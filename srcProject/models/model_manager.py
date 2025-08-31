@@ -18,7 +18,6 @@ from srcProject.models.model_base import BaseModel
 from srcProject.models.siliconflow_api import Silicon
 from srcProject.models.reader_xy_cut import XY_CUT
 
-
 class ModelFactory:
     @staticmethod
     def create(model_name: str='api',
@@ -39,8 +38,6 @@ class ModelFactory:
             return Google(api_keys=api_key, api_name=api_name)
         else:
             raise ValueError(f"不支持的模型名称: {model_name}")
-
-
 
 class ModelManager:
     def __init__(self,device: str = DEVICE):

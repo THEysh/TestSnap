@@ -6,7 +6,6 @@ from srcProject.config.constants import OCR_TEXT_VALUES, BlockType_MEMBER, Block
 from srcProject.data_loaders.pdf_dataset import PDFDataset
 from srcProject.models.layout_reader import find_reading_order_index
 from srcProject.models.model_manager import ModelManager
-from srcProject.models.reader_xy_cut import XY_CUT
 from srcProject.utlis.aftertreatment import batch_preprocess_detections, normalize_polygons_to_bboxes, poly_to_bbox, \
     convert_html_tables_to_markdown
 from srcProject.utlis.common import find_project_root, prepare_directory
@@ -160,22 +159,28 @@ def generate_markdown_document(data: List[List[Dict[str, Any]]], reading_order: 
     print(f"Markdown文档已生成并保存到: {output_path}")
     return final_markdown
 
-def main(path):
+async def main(path):
     sample_path = os.path.join(find_project_root(), path)
     file_name_without_extension, file_extension = os.path.splitext(os.path.basename(sample_path))
-    detections = asyncio.run(layout_prediction(sample_path, bool_ocr=True))
+    detections = await layout_prediction(sample_path, bool_ocr=True)
     page_order = read_prediction(detections)
+
     visualize_path = visualize_document(
         input_path=sample_path,  # 传入原始输入路径
         detections_per_page=detections,
         category_names=model_manager.layout_category_names,
-        page_order= page_order,
-        file_prefix = file_name_without_extension,
-        dpi_for_image_output=300  # 保持与加载图片DPI一致
+        page_order=page_order,
+        file_prefix=file_name_without_extension,
+        dpi_for_image_output=300
     )
-    md_save_path = os.path.join(find_project_root(), f"srcProject/output/visualizations/{file_name_without_extension}", f"{file_name_without_extension}.md")
-    generate_markdown_document(detections,page_order,output_path= md_save_path)
+    md_save_path = os.path.join(find_project_root(),
+                                f"srcProject/output/visualizations/{file_name_without_extension}",
+                                f"{file_name_without_extension}.md")
+    generate_markdown_document(detections, page_order, output_path=md_save_path)
     return md_save_path, visualize_path
+
+
 if __name__ == '__main__':
-    # "tests/test_data/多智能体强化学习综述.pdf"
-    main('tests/test_data/demo1_页面_3.png')
+    model_manager = ModelManager()
+    asyncio.run(main('tests/test_data/demo1_页面_3.png'))
+

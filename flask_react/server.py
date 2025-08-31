@@ -1,24 +1,24 @@
+from srcProject.main_process_sequence import main
 from flask import Flask, request, jsonify, send_from_directory, Response
 from flask_cors import CORS
 import os
 import mimetypes
-import shutil
 import logging
-from srcProject.main_process_sequence import main
-from srcProject.models.model_manager import ModelManager
 from srcProject.utlis.common import find_project_root, to_relative_path
 from werkzeug.utils import secure_filename
 import uuid
+import nest_asyncio
+import asyncio
+nest_asyncio.apply()
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('TextSnapServer')
 app = Flask(__name__)
-CORS(app)  # 允许跨域请求
 
+CORS(app)  # 允许跨域请求
 # 获取项目根目录
 project_root = find_project_root()
-
 # 设置静态文件类型
 mimetypes.add_type('image/webp', '.webp')
 mimetypes.add_type('image/svg+xml', '.svg')
@@ -206,7 +206,7 @@ def upload_file(file, file_type):
             return {'success': False, 'error': f'只支持以下文件类型: {supported}'}
         # 生成安全的文件名
         filename = secure_filename(file.filename)
-        unique_filename = f"{uuid.uuid4().hex[:4]}_{filename}"
+        unique_filename = f"{uuid.uuid4().hex[:8]}{ext}"
         file_path = os.path.join(config['upload_folder'], unique_filename)
         
         # 确保上传目录存在
@@ -292,11 +292,9 @@ def view_file(filename, file_type):
         original_path = os.path.join(config['upload_folder'], filename)
         if os.path.exists(original_path):
             return send_from_directory(config['upload_folder'], filename), None
-            
-        # 新增：检查相对路径的文件（用于处理后的PDF文件）
+        # 获取目录和文件名
         relative_full_path = os.path.join(project_root, filename)
         if os.path.exists(relative_full_path):
-            # 获取目录和文件名
             directory = os.path.dirname(relative_full_path)
             file_name = os.path.basename(relative_full_path)
             return send_from_directory(directory, file_name), None
@@ -309,44 +307,32 @@ def view_file(filename, file_type):
         return None, {'success': False, 'error': f'文件访问错误: {str(e)}'}
 
 def process_pdf_image(file_path):
-    """
-    处理PDF文件 - 这里可以添加你的PDF处理逻辑
-    例如：OCR、文本提取、图片提取、格式转换等
-    目前作为示例，我们简单复制文件并添加处理标记
-    """
     try:
-        # 生成处理后的文件名
-        md_save_path, visualize_path = main(file_path)
-        is_processed_file_exists = os.path.isfile(visualize_path)
-        if not is_processed_file_exists:
-            return {
-                'success': False,
-                'error': f'PDF路径不存在，处理失败'
-            }
-        # 转为相对目录
+        loop = asyncio.get_event_loop()  # 获取当前 event loop
+        md_save_path, visualize_path = loop.run_until_complete(main(file_path))
+
+        if not os.path.isfile(visualize_path):
+            return {'success': False, 'error': '路径不存在，处理失败'}
+
         visualize_relative_path = to_relative_path(visualize_path)
         md_relative_path = to_relative_path(md_save_path)
-        # 使用相对路径作为processed_filename，这样前端就能正确构建URL
-        processed_filename = visualize_relative_path
-        logger.info(f"PDF处理完成: {visualize_relative_path}")
-        # 返回处理结果信息
+
         return {
             'success': True,
             'processed_path': visualize_relative_path,
-            'processed_filename': processed_filename,
+            'processed_filename': visualize_relative_path,
             'md_path': md_relative_path,
             'processing_info': {
                 'method': '示例处理',
-                'description': '这是一个示例处理结果，实际应用中会进行真实的PDF处理',
+                'description': '示例处理',
                 'file_size': os.path.getsize(visualize_path)
             }
         }
 
     except Exception as e:
-        return {
-            'success': False,
-            'error': f'处理失败: {str(e)}'
-        }
+        import traceback
+        logger.error(f"process_pdf_image 异常:\n{traceback.format_exc()}")
+        return {'success': False, 'error': str(e)}
 
 @app.route('/api/pdf/upload', methods=['POST'])
 def upload_pdf():
