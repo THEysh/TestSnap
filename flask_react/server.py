@@ -12,6 +12,7 @@ from werkzeug.utils import secure_filename
 import uuid
 import nest_asyncio
 import asyncio
+
 nest_asyncio.apply()
 
 # 配置日志
@@ -40,16 +41,19 @@ FILE_TYPE_CONFIG = {
     'pdf': {
         'upload_folder': UPLOAD_FOLDER,
         'allowed_extensions': ALLOWED_EXTENSIONS,
-        'process_func': lambda path: process_pdf_image(path),
+        'process_func': lambda path, task_id: process_pdf_image(path, task_id),
         'success_message': 'PDF处理完成'
     },
     'image': {
         'upload_folder': IMAGE_UPLOAD_FOLDER,
         'allowed_extensions': ALLOWED_IMAGE_EXTENSIONS,
-        'process_func': lambda path: process_pdf_image(path),
+        'process_func': lambda path, task_id: process_pdf_image(path, task_id),
         'success_message': '图片处理完成'
     }
 }
+
+# 存储任务进度的字典，键为任务ID，值包含进度信息
+TASK_PROCESS = {}
 
 # 确保上传目录存在
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -57,6 +61,129 @@ os.makedirs(IMAGE_UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['IMAGE_UPLOAD_FOLDER'] = IMAGE_UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
+
+
+def update_task_progress(task_id, progress, status='processing', message=None, result=None):
+    """
+    更新任务进度
+    :param task_id: 任务ID
+    :param progress: 进度百分比 (0-100)
+    :param status: 任务状态 ('processing', 'completed', 'failed')
+    :param message: 状态消息
+    :param result: 任务结果（任务完成时）
+    """
+    if task_id in TASK_PROCESS:
+        TASK_PROCESS[task_id].update({
+            'progress': progress,
+            'status': status,
+            'message': message,
+            'updated_at': time.time()
+        })
+        if result:
+            TASK_PROCESS[task_id]['result'] = result
+        logger.info(f"任务 {task_id} 进度更新: {progress}% - {status} - {message or ''}")
+
+
+def complete_task(task_id, result=None, error=None):
+    """
+    完成任务并清理进度信息
+    :param task_id: 任务ID
+    :param result: 成功结果
+    :param error: 错误信息
+    """
+    if task_id not in TASK_PROCESS:
+        logger.warning(f"尝试完成不存在的任务: {task_id}")
+        return
+
+    if error:
+        TASK_PROCESS[task_id].update({
+            'progress': 0,
+            'status': 'failed',
+            'message': error,
+            'updated_at': time.time()
+        })
+        logger.error(f"任务 {task_id} 失败: {error}")
+    else:
+        TASK_PROCESS[task_id].update({
+            'progress': 100,
+            'status': 'completed',
+            'message': '处理完成',
+            'result': result,
+            'updated_at': time.time()
+        })
+        logger.info(f"任务 {task_id} 成功完成")
+
+    # 延迟删除任务信息（给客户端时间获取最终状态）
+    def cleanup_task():
+        time.sleep(10)  # 10秒后清理
+        if task_id in TASK_PROCESS:
+            del TASK_PROCESS[task_id]
+            logger.info(f"任务 {task_id} 信息已清理")
+
+    cleanup_thread = threading.Thread(target=cleanup_task)
+    cleanup_thread.daemon = True
+    cleanup_thread.start()
+
+
+@app.route('/api/task/progress/<task_id>', methods=['GET'])
+def get_task_progress(task_id):
+    """
+    获取任务进度
+    """
+    try:
+        if task_id not in TASK_PROCESS:
+            return jsonify({
+                'success': False,
+                'error': '任务不存在或已完成'
+            }), 404
+        task_info = TASK_PROCESS[task_id].copy()
+        return jsonify({
+            'success': True,
+            'task_id': task_id,
+            'progress': task_info.get('progress', 0),
+            'status': task_info.get('status', 'unknown'),
+            'message': task_info.get('message', ''),
+            'result': task_info.get('result'),
+            'updated_at': task_info.get('updated_at')
+        })
+    except Exception as e:
+        logger.error(f"获取任务进度失败 {task_id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'获取进度失败: {str(e)}'
+        }), 500
+
+
+@app.route('/api/task/list', methods=['GET'])
+def list_tasks():
+    """
+    获取所有任务列表
+    """
+    try:
+        tasks = []
+        for task_id, task_info in TASK_PROCESS.items():
+            tasks.append({
+                'task_id': task_id,
+                'progress': task_info.get('progress', 0),
+                'status': task_info.get('status', 'unknown'),
+                'message': task_info.get('message', ''),
+                'created_at': task_info.get('created_at'),
+                'updated_at': task_info.get('updated_at')
+            })
+
+        return jsonify({
+            'success': True,
+            'tasks': tasks,
+            'total': len(tasks)
+        })
+    except Exception as e:
+        logger.error(f"获取任务列表失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'获取任务列表失败: {str(e)}'
+        }), 500
+
+
 @app.route('/api/markdown', methods=['POST'])
 def get_markdown():
     """
@@ -142,6 +269,7 @@ def get_markdown():
             'error': f'服务器内部错误: {str(e)}'
         }), 500
 
+
 @app.route('/api/files/<path:filename>')
 def serve_file(filename):
     """
@@ -180,13 +308,15 @@ def serve_file(filename):
             'error': f'文件服务错误: {str(e)}'
         }), 500
 
+
 def schedule_file_deletion(file_path, delay_seconds=10800):
     """
     安排文件在指定分钟后被删除
 
     :param file_path: 文件路径
-    :param delay_seconds: 延迟秒数，默认为10秒
+    :param delay_seconds: 延迟秒数，默认为10800秒
     """
+
     def delete_file():
         if os.path.exists(file_path):
             try:
@@ -195,17 +325,17 @@ def schedule_file_deletion(file_path, delay_seconds=10800):
             except Exception as e:
                 logger.error(f"删除文件失败: {file_path}, 错误: {str(e)}")
 
-
     # 创建定时器线程
     timer = threading.Timer(delay_seconds, delete_file)
     timer.daemon = True  # 设置为守护线程，避免阻止服务器关闭
     timer.start()
 
+
 def schedule_directory_deletion(dir_path, delay_seconds=10800):
     """
     安排目录在指定秒后被删除
     :param dir_path: 目录路径
-    :param delay_seconds: 延迟秒数，默认为10秒
+    :param delay_seconds: 延迟秒数，默认为10800秒
     """
 
     def delete_directory():
@@ -232,11 +362,14 @@ def schedule_directory_deletion(dir_path, delay_seconds=10800):
     timer.daemon = True  # 设置为守护线程，避免阻止服务器关闭
     timer.start()
 
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+
 def allowed_image_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
+
 
 # 通用文件上传函数
 def upload_file(file, file_type):
@@ -249,7 +382,7 @@ def upload_file(file, file_type):
     try:
         if not file or file.filename == '':
             return {'success': False, 'error': '未选择文件'}
-            
+
         # 获取文件类型配置
         config = FILE_TYPE_CONFIG.get(file_type)
         if not config:
@@ -263,10 +396,10 @@ def upload_file(file, file_type):
         filename = secure_filename(file.filename)
         unique_filename = f"{uuid.uuid4().hex[:8]}{ext}"
         file_path = os.path.join(config['upload_folder'], unique_filename)
-        
+
         # 确保上传目录存在
         os.makedirs(config['upload_folder'], exist_ok=True)
-        
+
         # 保存文件
         file.save(file_path)
         logger.info(f"已上传{file_type}文件: {filename} 至 {file_path}")
@@ -274,7 +407,7 @@ def upload_file(file, file_type):
         schedule_file_deletion(file_path)
         # 获取文件信息
         file_size = os.path.getsize(file_path)
-        
+
         return {
             'success': True,
             'message': f'{file_type}文件上传成功',
@@ -285,50 +418,80 @@ def upload_file(file, file_type):
                 'file_path': file_path
             }
         }
-        
+
     except Exception as e:
         logger.error(f"{file_type}文件上传失败: {str(e)}")
         return {'success': False, 'error': f'上传失败: {str(e)}'}
 
-# 通用文件处理函数
-def process_file(filename, file_type):
+
+# 通用文件处理函数（异步版本）
+def process_file_async(filename, file_type):
     """
-    通用文件处理函数
+    异步处理文件，返回任务ID
     :param filename: 文件名
     :param file_type: 文件类型 ('pdf' 或 'image')
-    :return: 包含处理结果的字典
+    :return: 包含任务ID的字典
     """
     try:
         # 获取文件类型配置
         config = FILE_TYPE_CONFIG.get(file_type)
         if not config:
             return {'success': False, 'error': f'不支持的文件类型: {file_type}'}
-            
+
         # 构建文件路径
         file_path = os.path.join(config['upload_folder'], filename)
-        
+
         # 检查文件是否存在
         if not os.path.exists(file_path):
-            return {'success': False, 'error': '文件不存在'}\
-            
-        # 处理文件
-        result = config['process_func'](file_path)
-        
-        if result['success']:
-            return {
-                'success': True,
-                'message': config['success_message'],
-                'original_file': filename,
-                'processed_file': result['processed_filename'],
-                'processing_info': result['processing_info'],
-                'md_path': result['md_path']
-            }
-        else:
-            return {'success': False, 'error': result['error']}
-            
+            return {'success': False, 'error': '文件不存在'}
+
+        # 生成任务ID
+        task_id = f"{file_type}_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}"
+
+        # 初始化任务进度
+        TASK_PROCESS[task_id] = {
+            'progress': 0,
+            'status': 'started',
+            'message': f'开始处理{file_type}文件',
+            'file_type': file_type,
+            'filename': filename,
+            'created_at': time.time(),
+            'updated_at': time.time()
+        }
+
+        logger.info(f"创建任务 {task_id}: 处理{file_type}文件 {filename}")
+
+        # 在新线程中处理文件
+        def process_worker():
+            try:
+                update_task_progress(task_id, 10, 'processing', f'正在处理{file_type}文件...')
+
+                # 调用处理函数
+                result = config['process_func'](file_path, task_id)
+
+                if result['success']:
+                    complete_task(task_id, result)
+                else:
+                    complete_task(task_id, error=result['error'])
+
+            except Exception as e:
+                logger.error(f"任务 {task_id} 处理异常: {str(e)}")
+                complete_task(task_id, error=f'处理失败: {str(e)}')
+
+        thread = threading.Thread(target=process_worker)
+        thread.daemon = True
+        thread.start()
+
+        return {
+            'success': True,
+            'message': f'{file_type}文件处理已启动',
+            'task_id': task_id
+        }
+
     except Exception as e:
-        logger.error(f"{file_type}文件处理失败: {str(e)}")
-        return {'success': False, 'error': f'处理失败: {str(e)}'}
+        logger.error(f"{file_type}文件异步处理失败: {str(e)}")
+        return {'success': False, 'error': f'启动处理失败: {str(e)}'}
+
 
 # 通用文件查看函数
 def view_file(filename, file_type):
@@ -354,25 +517,44 @@ def view_file(filename, file_type):
             directory = os.path.dirname(relative_full_path)
             file_name = os.path.basename(relative_full_path)
             return send_from_directory(directory, file_name), None
-            
+
         logger.warning(f"文件不存在: {filename}, 类型: {file_type}")
         return None, {'success': False, 'error': '文件不存在'}
-        
+
     except Exception as e:
         logger.error(f"{file_type}文件查看失败: {str(e)}")
         return None, {'success': False, 'error': f'文件访问错误: {str(e)}'}
 
-def process_pdf_image(file_path):
+
+def process_pdf_image(file_path, task_id=None):
+    """
+    处理PDF/图片文件
+    :param file_path: 文件路径
+    :param task_id: 任务ID（可选，用于进度更新）
+    """
     try:
+        # 更新进度：开始处理
+        if task_id:
+            update_task_progress(task_id, 20, 'processing', '正在解析文件...')
+
         loop = asyncio.get_event_loop()  # 获取当前 event loop
+
+        # 更新进度：调用主处理函数
+        if task_id:
+            update_task_progress(task_id, 50, 'processing', '正在执行核心处理...')
+
         md_save_path, visualize_path = loop.run_until_complete(main(file_path))
+
+        # 更新进度：处理完成，检查结果
+        if task_id:
+            update_task_progress(task_id, 80, 'processing', '正在生成结果文件...')
 
         if not os.path.isfile(visualize_path):
             return {'success': False, 'error': '路径不存在，处理失败'}
 
         visualize_relative_path = to_relative_path(visualize_path)
         md_relative_path = to_relative_path(md_save_path)
-        
+
         # 获取处理结果目录（假设两个文件在同一个目录下）
         # 尝试从visualize_path获取目录，如果失败则从md_save_path获取
         try:
@@ -381,28 +563,35 @@ def process_pdf_image(file_path):
                 result_directory = os.path.dirname(md_save_path)
         except Exception:
             result_directory = None
-        
+
         # 如果找到目录，安排删除
         if result_directory and os.path.isdir(result_directory):
             schedule_directory_deletion(result_directory)
 
-        return {
+        # 更新进度：完成
+        if task_id:
+            update_task_progress(task_id, 95, 'processing', '正在整理结果...')
+
+        result = {
             'success': True,
-            'processed_path': visualize_relative_path,
-            'processed_filename': visualize_relative_path,
+            'processed_file': visualize_relative_path,
             'md_path': md_relative_path,
             'processing_info': {
                 'method': '示例处理',
                 'description': '示例处理',
                 'file_size': os.path.getsize(visualize_path),
-                'auto_delete_info': '该文件将在10秒后自动删除'
+                'auto_delete_info': '该文件将在3小时后自动删除'
             }
         }
 
+        return result
+
     except Exception as e:
         import traceback
-        logger.error(f"process_pdf_image 异常:\n{traceback.format_exc()}")
+        error_msg = f"process_pdf_image 异常: {str(e)}"
+        logger.error(f"{error_msg}\n{traceback.format_exc()}")
         return {'success': False, 'error': str(e)}
+
 
 @app.route('/api/pdf/upload', methods=['POST'])
 def upload_pdf():
@@ -414,15 +603,16 @@ def upload_pdf():
             'success': False,
             'error': '没有上传文件'
         }), 400
-    
+
     result = upload_file(request.files['file'], 'pdf')
     status_code = 200 if result['success'] else 400 if 'error' in result and '未选择文件' in result['error'] else 500
     return jsonify(result), status_code
 
+
 @app.route('/api/pdf/process', methods=['POST'])
 def process_uploaded_pdf():
     """
-    处理已上传的PDF文件
+    处理已上传的PDF文件（异步版本）
     """
     try:
         data = request.get_json()
@@ -432,29 +622,19 @@ def process_uploaded_pdf():
                 'success': False,
                 'error': '请提供文件名'
             }), 400
-        
-        result = process_file(data['filename'], 'pdf')
-        status_code = 200 if result['success'] else 400 if 'error' in result and ('未选择文件' in result['error'] or '请提供文件名' in result['error']) else 404 if 'error' in result and '文件不存在' in result['error'] else 500
+
+        result = process_file_async(data['filename'], 'pdf')
+        status_code = 200 if result['success'] else 400 if 'error' in result and (
+                    '未选择文件' in result['error'] or '请提供文件名' in result[
+                'error']) else 404 if 'error' in result and '文件不存在' in result['error'] else 500
         return jsonify(result), status_code
-        
+
     except Exception as e:
         logger.error(f"PDF处理请求异常: {str(e)}")
         return jsonify({
             'success': False,
             'error': f'处理失败: {str(e)}'
         }), 500
-
-@app.route('/api/pdf/view/<filename>')
-def view_pdf(filename):
-    """
-    查看PDF文件
-    """
-    logger.info(f"请求查看PDF文件: {filename}")
-    response, error = view_file(filename, 'pdf')
-    if error:
-        status_code = 404 if error['error'] == '文件不存在' else 500
-        return jsonify(error), status_code
-    return response
 
 @app.route('/api/pdf/list', methods=['GET'])
 def list_pdfs():
@@ -476,7 +656,6 @@ def list_pdfs():
                         'modified': os.path.getmtime(file_path)
                     })
 
-
         return jsonify({
             'success': True,
             'original_files': original_files,
@@ -489,6 +668,7 @@ def list_pdfs():
             'error': f'获取文件列表失败: {str(e)}'
         }), 500
 
+
 # 新增：图片上传API
 @app.route('/api/image/upload', methods=['POST'])
 def upload_image():
@@ -500,10 +680,11 @@ def upload_image():
             'success': False,
             'error': '没有上传文件'
         }), 400
-    
+
     result = upload_file(request.files['file'], 'image')
     status_code = 200 if result['success'] else 400 if 'error' in result and '未选择文件' in result['error'] else 500
     return jsonify(result), status_code
+
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
@@ -512,14 +693,16 @@ def health_check():
     """
     return jsonify({
         'status': 'healthy',
-        'project_root': project_root
+        'project_root': project_root,
+        'active_tasks': len(TASK_PROCESS)
     })
 
-# 新增：图片处理API
+
+# 新增：图片处理API（异步版本）
 @app.route('/api/image/process', methods=['POST'])
 def process_uploaded_image():
     """
-    处理已上传的图片文件
+    处理已上传的图片文件（异步版本）
     """
     try:
         data = request.get_json()
@@ -529,11 +712,13 @@ def process_uploaded_image():
                 'success': False,
                 'error': '请提供文件名'
             }), 400
-        
-        result = process_file(data['filename'], 'image')
-        status_code = 200 if result['success'] else 400 if 'error' in result and ('未选择文件' in result['error'] or '请提供文件名' in result['error']) else 404 if 'error' in result and '文件不存在' in result['error'] else 500
+
+        result = process_file_async(data['filename'], 'image')
+        status_code = 200 if result['success'] else 400 if 'error' in result and (
+                    '未选择文件' in result['error'] or '请提供文件名' in result[
+                'error']) else 404 if 'error' in result and '文件不存在' in result['error'] else 500
         return jsonify(result), status_code
-        
+
     except Exception as e:
         logger.error(f"图片处理请求异常: {str(e)}")
         return jsonify({
@@ -541,25 +726,13 @@ def process_uploaded_image():
             'error': f'处理失败: {str(e)}'
         }), 500
 
-# 新增：图片查看API
-@app.route('/api/image/view/<filename>')
-def view_image(filename):
-    """
-    查看图片文件
-    """
-    logger.info(f"请求查看图片文件: {filename}")
-    response, error = view_file(filename, 'image')
-    if error:
-        status_code = 404 if error['error'] == '文件不存在' else 500
-        return jsonify(error), status_code
-    return response
-
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({
         'success': False,
         'error': 'API接口不存在'
     }), 404
+
 
 @app.errorhandler(500)
 def internal_error(error):
@@ -570,20 +743,21 @@ def internal_error(error):
 
 
 if __name__ == '__main__':
-
     PORT = 7861
     print(f"Flask服务器启动在端口: {PORT}")
     print(f"项目根目录: {project_root}")
     print(f"API地址: http://localhost:{PORT}/api/markdown")
     print(f"文件服务: http://localhost:{PORT}/api/files/<文件路径>")
     print(f"健康检查: http://localhost:{PORT}/api/health")
+    # 新增：任务进度API信息
+    print(f"任务进度查询: http://localhost:{PORT}/api/task/progress/<任务ID>")
+    print(f"任务列表: http://localhost:{PORT}/api/task/list")
     # 新增：图片API信息
     print(f"图片上传: http://localhost:{PORT}/api/image/upload")
     print(f"图片处理: http://localhost:{PORT}/api/image/process")
-    print(f"图片查看: http://localhost:{PORT}/api/image/view/<文件名>")
     # PDF API信息
     print(f"PDF上传: http://localhost:{PORT}/api/pdf/upload")
     print(f"PDF处理: http://localhost:{PORT}/api/pdf/process")
-    print(f"PDF查看: http://localhost:{PORT}/api/pdf/view/<文件名>")
+
 
     app.run(host='0.0.0.0', port=PORT, debug=True)

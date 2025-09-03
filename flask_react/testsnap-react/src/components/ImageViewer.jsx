@@ -15,7 +15,7 @@ const ImageViewer = ({ file, processedFileUrl }) => {
         return (
             <div className="image-placeholder">
                 <div className="image-placeholder-icon">🖼️</div>
-                <p>请先上传图片文件</p>
+                <p>请先上传图片文件，如果上传无效，请刷新再尝试</p>
             </div>
         );
     };

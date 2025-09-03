@@ -70,73 +70,123 @@ function App() {
             setProcessedFileUrl(null);
         }
     };
+// 定义在 handleProcessFile 外面，全局共享
+let checkProgress = null;
+let timeout = null;
 
-    // 处理已上传文件的函数
-    const handleProcessFile = async () => {
-        if (!uploadedFileInfo || !file) {
-            return;
-        }
+// 统一清理函数
+const stopPolling = () => {
+    if (checkProgress) {
+        clearInterval(checkProgress);
+        checkProgress = null;
+    }
+    if (timeout) {
+        clearTimeout(timeout);
+        timeout = null;
+    }
+};
 
-        setStatus('processing');
+// 处理已上传文件的函数
+const handleProcessFile = async () => {
+    if (!uploadedFileInfo || !file) {
+        return;
+    }
+
+    setStatus('processing');
+    setProgress(0); // 重置进度
+    
+    try {
+        // 处理文件
+        const isPdf = file.type.includes('pdf');
+        const processUrl = isPdf 
+            ? 'http://localhost:7861/api/pdf/process' 
+            : 'http://localhost:7861/api/image/process';
         
-        try {
-            // 处理文件
-            const isPdf = file.type.includes('pdf');
-            const processUrl = isPdf 
-                ? 'http://localhost:7861/api/pdf/process' 
-                : 'http://localhost:7861/api/image/process';
-            
-            const processResponse = await fetch(processUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filename: uploadedFileInfo.unique_filename }),
-            });
-            
-            const processResult = await processResponse.json();
-
-            if (!processResult.success) {
-                throw new Error(processResult.message || '文件处理失败');
-            }
-
-            setStatus('success');
-            
-            // 确保processResult.processed_file存在
-            if (processResult && processResult.processed_file) {
-                // 根据文件类型设置处理后的文件URL
-                if (isPdf) {
-                    // 检查processed_file是否包含路径分隔符（表示它是一个相对路径）
-                    // 注意：由于我们已经修改了后端的view_file函数，它现在可以处理相对路径
-                    // 所以我们可以直接使用processResult.processed_file作为URL的一部分
-                    setProcessedFileUrl(`http://localhost:7861/api/pdf/view/${encodeURIComponent(processResult.processed_file)}`);
-                    // 对于下载链接，我们只需要文件名
-                    const filename = processResult.processed_file.split('/').pop();
-                    setDownloadLink(filename);
-                    
-                } else {
-                    // 对于图片文件，同样需要使用encodeURIComponent来编码相对路径
-                    setProcessedFileUrl(`http://localhost:7861/api/image/view/${encodeURIComponent(processResult.processed_file)}`);
-                    // 对于下载链接，我们只需要文件名
-                    const filename = processResult.processed_file.split('/').pop();
-                    setDownloadLink(filename);
-                }
-            } else {
-                console.error('处理结果中缺少processed_file字段');
-                setStatus('error');
-                setProcessedFileUrl(null);
-            }
-
-            // 如果存在md_path，设置自动加载的Markdown路径
-            if (processResult.md_path) {
-                setAutoLoadMarkdownPath(processResult.md_path);
-            }
-
-        } catch (error) {
-            console.error('处理失败:', error);
-            setStatus('error');
-            setProcessedFileUrl(null);
+        const processResponse = await fetch(processUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: uploadedFileInfo.unique_filename }),
+        });
+        
+        if (!processResponse.ok) {
+            throw new Error(`处理请求失败: ${processResponse.status}`);
         }
-    };
+        
+        const processResult = await processResponse.json();
+        if (!processResult.success || !processResult.task_id) {
+            throw new Error(processResult.error || '启动处理失败');
+        }
+        
+        const { task_id } = processResult;
+        console.log(`任务已启动，ID: ${task_id}`);
 
+        // 启动轮询
+        checkProgress = setInterval(async () => {
+            try {
+                const progResponse = await fetch(`http://localhost:7861/api/task/progress/${task_id}`);
+                if (!progResponse.ok) {
+                    console.error(`获取进度失败: ${progResponse.status}`);
+                    return;
+                }
+                
+                const progress = await progResponse.json();
+                if (!progress.success) {
+                    console.error('获取进度失败:', progress.error);
+                    stopPolling();
+                    setStatus('error');
+                    return;
+                }
+                
+                setProgress(progress.progress || 0);
+                console.log(`进度: ${progress.progress}% - ${progress.message || ''}`);
+                
+                if (progress.status === 'completed') {
+                    stopPolling(); // ✅ 拿到结果立即停掉轮询
+                    console.log('处理完成!', progress.result);
+
+                    if (!progress.result || !progress.result.success) {
+                        throw new Error(progress.result?.error || '处理结果无效');
+                    }
+                    const result = progress.result;
+                    // 转换路径
+                    const processedPath = result.processed_file.replace(/\\/g, '/'); 
+                    const processed_md_path = result.md_path.replace(/\\/g, '/');
+                    setProcessedFileUrl(`http://localhost:7861/api/files/${encodeURIComponent(processedPath)}`);
+                    const filename = processedPath.split('/').pop();
+                    setDownloadLink(filename);
+                    setAutoLoadMarkdownPath(processed_md_path);
+                    setStatus('completed');
+                    setProgress(100);
+
+                } else if (progress.status === 'failed') {
+                    stopPolling(); // ✅ 失败时也要停掉
+                    console.error('处理失败:', progress.message);
+                    setStatus('error');
+                    setProgress(0);
+                }
+                // processing 情况下继续轮询
+                
+            } catch (pollError) {
+                console.error('轮询进度时出错:', pollError);
+            }
+        }, 3000);
+
+        // 设置超时，避免无限轮询
+        timeout = setTimeout(() => {
+            stopPolling();
+            console.error('处理超时');
+            setStatus('error');
+            setProgress(0);
+        }, 5 * 60 * 1000); // 5分钟超时
+
+    } catch (error) {
+        stopPolling(); // ✅ 出现异常也要清理
+        console.error('处理失败:', error);
+        setStatus('error');
+        setProgress(0);
+        setProcessedFileUrl(null);
+    }
+};
     const handleClearFile = () => {
         setFile(null);
         setStatus('idle');
