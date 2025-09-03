@@ -1,0 +1,129 @@
+/* Image Viewer 组件样式 */
+.image-pane {
+    flex: 1;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.image-pane h2 {
+    margin: 0 0 15px 0;
+    color: #667eea;
+    font-size: 1.3em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.image-pane h2::before {
+    content: '🖼️';
+    font-size: 1.2em;
+}
+
+.image-viewer {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    overflow: hidden;
+    min-height: 400px;
+    position: relative;
+}
+
+/* 原始图片样式 */
+.original-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    transition: transform 0.3s ease;
+    cursor: zoom-in;
+}
+
+.original-image:hover {
+    transform: scale(1.02);
+}
+
+/* 处理后的图片样式 */
+.processed-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+.processed-image:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* 图片占位符样式 */
+.image-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #666;
+    padding: 40px 20px;
+}
+
+.image-placeholder-icon {
+    font-size: 4em;
+    margin-bottom: 20px;
+    opacity: 0.5;
+}
+
+.image-placeholder p {
+    margin: 0;
+    font-size: 1.1em;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .image-pane {
+        padding: 15px;
+    }
+    
+    .image-viewer {
+        min-height: 300px;
+    }
+    
+    .image-placeholder-icon {
+        font-size: 3em;
+        margin-bottom: 15px;
+    }
+    
+    .image-placeholder p {
+        font-size: 1em;
+    }
+}
+
+/* 图片加载动画 */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.original-image,
+.processed-image {
+    animation: fadeIn 0.5s ease-out;
+}
+
+/* 下载按钮样式 */
+.image-pane .btn {
+    align-self: flex-start;
+    margin-bottom: 15px;
+}

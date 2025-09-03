@@ -1,0 +1,92 @@
+/* src/components/PDFViewer.css */
+
+.pdf-pane {
+    flex: 1;
+    padding: 30px;
+    overflow: auto;
+    border-right: 1px solid #e0e0e0;
+    background: #fafafa;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    margin: 10px;
+}
+
+.pdf-pane:last-child {
+    border-right: none;
+    border-bottom: none; /* for mobile */
+}
+
+.pdf-pane h2 {
+    margin-bottom: 20px;
+    color: #667eea;
+    font-size: 1.4em;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 600;
+}
+
+.pdf-pane h2::before {
+    font-size: 1.3em;
+    content: '📄'; /* PDF图标 */
+}
+
+.pdf-viewer {
+    width: 100%;
+    height: 100vh;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    background: white;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    margin-top: 15px;
+}
+
+.pdf-viewer iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+.pdf-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #888;
+    text-align: center;
+    padding: 20px;
+}
+
+.pdf-placeholder-icon {
+    font-size: 5em;
+    margin-bottom: 25px;
+    opacity: 0.6;
+    color: #667eea;
+}
+
+.pdf-placeholder p {
+    font-size: 1.1em;
+    color: #666;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .pdf-pane {
+        border-right: none;
+        border-bottom: 1px solid #e0e0e0;
+        min-height: 300px;
+        margin: 5px 0;
+        padding: 20px;
+    }
+    
+    .pdf-viewer {
+        height: calc(100% - 50px);
+    }
+    
+    .pdf-placeholder-icon {
+        font-size: 3em;
+        margin-bottom: 15px;
+    }
+}
