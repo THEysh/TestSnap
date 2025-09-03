@@ -335,8 +335,9 @@ const MarkdownViewer = ({ autoLoadPath }) => {
   return (
     <div className="markdown-container">
       <div className="header">
-        <h1>Markdown 数学公式渲染器</h1>
-        <p>支持 LaTeX 数学公式的实时 Markdown 渲染</p>
+        <p>支持image,LaTeX数学公式的实时 Markdown 渲染</p>
+        <p>    计算结果3小时后自动删除</p>
+
       </div>
 
       <div className="controls">

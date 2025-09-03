@@ -5,8 +5,8 @@ const Header = () => {
     return (
         <div className="header">
             <div className="header-content">
-                <h1>PDF 处理器</h1>
-                <p>上传、处理并对比PDF文件</p>
+                <h1>TextSnap</h1>
+                <p>上传pdf,image。把它们转换为md文档</p>
             </div>
         </div>
     );

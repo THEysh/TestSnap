@@ -4,6 +4,9 @@ from flask_cors import CORS
 import os
 import mimetypes
 import logging
+import shutil
+import threading
+import time
 from srcProject.utlis.common import find_project_root, to_relative_path
 from werkzeug.utils import secure_filename
 import uuid
@@ -177,6 +180,58 @@ def serve_file(filename):
             'error': f'文件服务错误: {str(e)}'
         }), 500
 
+def schedule_file_deletion(file_path, delay_seconds=10800):
+    """
+    安排文件在指定分钟后被删除
+
+    :param file_path: 文件路径
+    :param delay_seconds: 延迟秒数，默认为10秒
+    """
+    def delete_file():
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                logger.info(f"文件已自动删除: {file_path}")
+            except Exception as e:
+                logger.error(f"删除文件失败: {file_path}, 错误: {str(e)}")
+
+
+    # 创建定时器线程
+    timer = threading.Timer(delay_seconds, delete_file)
+    timer.daemon = True  # 设置为守护线程，避免阻止服务器关闭
+    timer.start()
+
+def schedule_directory_deletion(dir_path, delay_seconds=10800):
+    """
+    安排目录在指定秒后被删除
+    :param dir_path: 目录路径
+    :param delay_seconds: 延迟秒数，默认为10秒
+    """
+
+    def delete_directory():
+        if os.path.exists(dir_path):
+            try:
+                # 统计要删除的文件数量和总大小
+                total_files = 0
+                total_size = 0
+                for root, _, files in os.walk(dir_path):
+                    for file in files:
+                        total_files += 1
+                        total_size += os.path.getsize(os.path.join(root, file))
+
+                # 删除目录及其内容
+                shutil.rmtree(dir_path)
+                logger.info(
+                    f"目录已自动删除: {dir_path}, 共删除 {total_files} 个文件，总大小约 {total_size / 1024 / 1024:.2f} MB")
+            except Exception as e:
+                logger.error(f"删除目录失败: {dir_path}, 错误: {str(e)}")
+
+    logger.info(f"安排目录在{delay_seconds}秒后删除: {dir_path}")
+    # 创建定时器线程
+    timer = threading.Timer(delay_seconds, delete_directory)
+    timer.daemon = True  # 设置为守护线程，避免阻止服务器关闭
+    timer.start()
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -215,7 +270,8 @@ def upload_file(file, file_type):
         # 保存文件
         file.save(file_path)
         logger.info(f"已上传{file_type}文件: {filename} 至 {file_path}")
-        
+        # 安排xx后删除上传的文件
+        schedule_file_deletion(file_path)
         # 获取文件信息
         file_size = os.path.getsize(file_path)
         
@@ -316,6 +372,19 @@ def process_pdf_image(file_path):
 
         visualize_relative_path = to_relative_path(visualize_path)
         md_relative_path = to_relative_path(md_save_path)
+        
+        # 获取处理结果目录（假设两个文件在同一个目录下）
+        # 尝试从visualize_path获取目录，如果失败则从md_save_path获取
+        try:
+            result_directory = os.path.dirname(visualize_path)
+            if not result_directory:
+                result_directory = os.path.dirname(md_save_path)
+        except Exception:
+            result_directory = None
+        
+        # 如果找到目录，安排删除
+        if result_directory and os.path.isdir(result_directory):
+            schedule_directory_deletion(result_directory)
 
         return {
             'success': True,
@@ -325,7 +394,8 @@ def process_pdf_image(file_path):
             'processing_info': {
                 'method': '示例处理',
                 'description': '示例处理',
-                'file_size': os.path.getsize(visualize_path)
+                'file_size': os.path.getsize(visualize_path),
+                'auto_delete_info': '该文件将在10秒后自动删除'
             }
         }
 
