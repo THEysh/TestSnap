@@ -17,20 +17,8 @@ TextSnap is a powerful intelligent document processing system that focuses on co
 ---
 
 <p align="center">
-  <img src="srcProject/output/demo1_页面_1/demo1_页面_1_demo1_页面_1.png" width="47%">
-  <img src="srcProject/output/demo1_页面_2/demo1_页面_2_demo1_页面_2.png" width="47%">
-</p>
-<p align="center">
-  <img src="srcProject/output/demo1_页面_1/img.png" width="47%">
-  <img src="srcProject/output/demo1_页面_2/img.png" width="47%">
-</p>
-<p align="center">
   <img src="srcProject/output/Realization of superhuman intelligence in microstrip filter/image.png" width="47%">
-  <img src="srcProject/output/多智能体强化学习综述/image.png" width="47%">
-</p>
-<p align="center">
   <img src="srcProject/output/Realization of superhuman intelligence in microstrip filter/img.png" width="47%">
-  <img src="srcProject/output/多智能体强化学习综述/img.png" width="47%">
 </p>
 
 ---
