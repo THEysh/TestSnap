@@ -2,8 +2,7 @@
 data/models
 srcProject/output/visualizations
 flask_react/testsnap-react/node_modules
-flask_react/uploads
-flask_react/react
+flask_react/testsnap-react/dist
 configs.yaml
 configs_github.yaml
 .env
