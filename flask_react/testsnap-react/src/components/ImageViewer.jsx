@@ -1,6 +1,7 @@
 import './ImageViewer.css'; // 对应样式文件
+import React from 'react';
 
-const ImageViewer = ({ file, processedFileUrl }) => {
+const ImageViewer = React.memo(({ file, processedFileUrl }) => {
     const renderContent = () => {
         // 如果有处理后的文件URL，优先显示处理后的文件
         if (processedFileUrl) {
@@ -37,6 +38,9 @@ const ImageViewer = ({ file, processedFileUrl }) => {
             </div>
         </div>
     );
-};
+});
+
+// 添加自定义比较函数，确保只有当相关props变化时才重新渲染
+ImageViewer.displayName = 'ImageViewer';
 
 export default ImageViewer;

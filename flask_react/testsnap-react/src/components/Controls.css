@@ -84,6 +84,61 @@
     color: #333;
 }
 
+/* 进度条样式 */
+.progress-container {
+    margin: 10px 0;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 12px;
+    background-color: #e0e0e0;
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #66afe9, #2196F3);
+    transition: width 0.3s ease;
+    border-radius: 6px;
+    position: relative;
+}
+
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.2) 50%,
+        rgba(255, 255, 255, 0) 100%
+    );
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+.progress-text {
+    font-size: 14px;
+    color: #555;
+    text-align: center;
+    margin-top: 5px;
+    font-weight: 500;
+}
+
 .action-buttons {
     display: flex;
     gap: 10px;

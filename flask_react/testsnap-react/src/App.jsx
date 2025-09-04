@@ -10,17 +10,30 @@ function App() {
     const [status, setStatus] = useState('idle'); // idle, uploaded, processing, success, error
     const [progress, setProgress] = useState(0);
     const [processedFileUrl, setProcessedFileUrl] = useState(null);
+    const [processedFileUrlRef, setProcessedFileUrlRef] = useState(null); // 新增：用于跟踪上一个URL
     const [downloadLink, setDownloadLink] = useState(null);
     const [fileType, setFileType] = useState(''); // pdf 或 image
     const [uploadedFileInfo, setUploadedFileInfo] = useState(null); // 存储上传后的文件信息
     const [autoLoadMarkdownPath, setAutoLoadMarkdownPath] = useState(null); // 自动加载的Markdown文件路径
+    const [progressMessage, setProgressMessage] = useState(''); // 新增：存储进度消息
+
+    // 新增：安全地更新processedFileUrl的函数
+    const setProcessedFileUrlSafely = (newUrl) => {
+        // 只有当新URL与当前URL不同时才更新
+        if (newUrl !== processedFileUrlRef) {
+            setProcessedFileUrl(newUrl);
+            setProcessedFileUrlRef(newUrl);
+        }
+    };
 
     // 仅负责上传文件的函数
     const handleUploadFile = async (uploadedFile) => {
         setFile(uploadedFile);
         setStatus('uploading');
         setProgress(0);
+        setProgressMessage('');
         setProcessedFileUrl(null);
+        setProcessedFileUrlRef(null); // 重置引用
         setDownloadLink(null);
         setUploadedFileInfo(null);
         // 设置文件类型
@@ -42,6 +55,7 @@ function App() {
                     if (e.lengthComputable) {
                         const percent = (e.loaded / e.total) * 100;
                         setProgress(percent);
+                        setProgressMessage(`上传中: ${percent.toFixed(2)}%`);
                     }
                 });
                 xhr.onload = () => {
@@ -63,17 +77,18 @@ function App() {
             setStatus('uploaded');
             setUploadedFileInfo(uploadResponse.file_info);
             setProgress(100);
+            setProgressMessage('上传完成');
 
         } catch (error) {
             console.error('上传失败:', error);
             setStatus('error');
+            setProgressMessage('上传失败');
             setProcessedFileUrl(null);
         }
     };
 // 定义在 handleProcessFile 外面，全局共享
 let checkProgress = null;
 let timeout = null;
-
 // 统一清理函数
 const stopPolling = () => {
     if (checkProgress) {
@@ -94,6 +109,7 @@ const handleProcessFile = async () => {
 
     setStatus('processing');
     setProgress(0); // 重置进度
+    setProgressMessage('');
     
     try {
         // 处理文件
@@ -134,10 +150,12 @@ const handleProcessFile = async () => {
                     console.error('获取进度失败:', progress.error);
                     stopPolling();
                     setStatus('error');
+                    setProgressMessage('获取进度失败');
                     return;
                 }
                 
                 setProgress(progress.progress || 0);
+                setProgressMessage(progress.message || '处理中...');
                 console.log(`进度: ${progress.progress}% - ${progress.message || ''}`);
                 
                 if (progress.status === 'completed') {
@@ -151,25 +169,30 @@ const handleProcessFile = async () => {
                     // 转换路径
                     const processedPath = result.processed_file.replace(/\\/g, '/'); 
                     const processed_md_path = result.md_path.replace(/\\/g, '/');
-                    setProcessedFileUrl(`http://localhost:7861/api/files/${encodeURIComponent(processedPath)}`);
+                    const newProcessedFileUrl = `http://localhost:7861/api/files/${encodeURIComponent(processedPath)}`;
+                    setProcessedFileUrlSafely(newProcessedFileUrl); // 使用安全更新函数
                     const filename = processedPath.split('/').pop();
                     setDownloadLink(filename);
                     setAutoLoadMarkdownPath(processed_md_path);
                     setStatus('completed');
                     setProgress(100);
+                    setProgressMessage('处理完成');
 
                 } else if (progress.status === 'failed') {
                     stopPolling(); // ✅ 失败时也要停掉
                     console.error('处理失败:', progress.message);
                     setStatus('error');
                     setProgress(0);
+                    setProgressMessage(`处理失败: ${progress.message || '未知错误'}`);
+                    setProcessedFileUrl(null);
+                    setProcessedFileUrlRef(null); // 修复：添加重置引用
                 }
                 // processing 情况下继续轮询
                 
             } catch (pollError) {
                 console.error('轮询进度时出错:', pollError);
             }
-        }, 3000);
+        }, 2000);
 
         // 设置超时，避免无限轮询
         timeout = setTimeout(() => {
@@ -177,6 +200,7 @@ const handleProcessFile = async () => {
             console.error('处理超时');
             setStatus('error');
             setProgress(0);
+            setProgressMessage('处理超时');
         }, 5 * 60 * 1000); // 5分钟超时
 
     } catch (error) {
@@ -184,14 +208,18 @@ const handleProcessFile = async () => {
         console.error('处理失败:', error);
         setStatus('error');
         setProgress(0);
+        setProgressMessage(`处理失败: ${error.message}`);
         setProcessedFileUrl(null);
+        setProcessedFileUrlRef(null); // 重置引用
     }
 };
     const handleClearFile = () => {
         setFile(null);
         setStatus('idle');
         setProgress(0);
+        setProgressMessage('');
         setProcessedFileUrl(null);
+        setProcessedFileUrlRef(null); // 重置引用
         setDownloadLink(null);
         setFileType('');
         setUploadedFileInfo(null);
@@ -207,6 +235,7 @@ const handleProcessFile = async () => {
                 file={file}
                 status={status}
                 progress={progress}
+                progressMessage={progressMessage}
                 fileType={fileType}
             />
             <div className="pdf-container">

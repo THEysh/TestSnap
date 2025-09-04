@@ -2,6 +2,7 @@ import asyncio
 from PIL import Image
 from typing import List, Dict, Any
 from tqdm.asyncio import tqdm_asyncio
+from flask_react.log import update_task_progress, handle_progress
 from srcProject.config.constants import OCR_TEXT_VALUES, BlockType_MEMBER, BlockType
 from srcProject.data_loaders.pdf_dataset import PDFDataset
 from srcProject.models.layout_reader import find_reading_order_index
@@ -14,10 +15,12 @@ import os
 
 
 model_manager = ModelManager()
-async def layout_prediction(input_path: str, bool_ocr = True) -> List[List[Dict[str, Any]]]:
+async def layout_prediction(input_path: str, bool_ocr = True, task_id = None) -> List[List[Dict[str, Any]]]:
     """
     处理单个文档，执行布局分析、文本提取和结构化，并进行可视化。
     """
+    if task_id:
+        update_task_progress(task_id, 5, 'processing', '正在进行布局识别....')
     file_extension = os.path.splitext(input_path)[1].lower()
     all_page_images = []
     if file_extension == '.pdf':
@@ -49,64 +52,72 @@ async def layout_prediction(input_path: str, bool_ocr = True) -> List[List[Dict[
                     cropped_image = this_page_image.crop(bbox)
                     detections_per_page[i][j]['cropped_image'] = cropped_image
     print("布局预测完成。")
+    if task_id:
+        update_task_progress(task_id, 10, 'processing', '布局识别....完成')
     filtered_detections = batch_preprocess_detections(detections_per_page, iou_threshold=0.05)
     print("布局预测iou过滤完成")
     # 调用异步OCR函数
     if bool_ocr:
-        filtered_detections = await ocr_test(filtered_detections)
+        filtered_detections = await ocr_test(data=filtered_detections,task_id=task_id,
+                                             progress_callback=handle_progress)
     return filtered_detections
 
-async def ocr_test(data: List[List[Dict[str, Any]]], max_concurrent_tasks: int = 10):
-    """
-    处理 OCR 任务，并限制并发数量。
-    Args:
-        data: 包含检测结果的列表。
-        max_concurrent_tasks: 允许同时运行的最大 OCR 任务数量。
-    """
 
-    ocr_tasks = []  # 用于存储所有的 OCR 任务
-    # 创建一个信号量，用于控制并发任务的数量
+async def ocr_test(data: List[List[Dict[str, Any]]],
+                   max_concurrent_tasks: int = 10,
+                   task_id=None, progress_callback=None):  # 新增参数
+
+    ocr_tasks = []
     semaphore = asyncio.Semaphore(max_concurrent_tasks)
-    async def run_ocr_task(image, i_idx, j_idx, inf:BlockType=None):
-        """
-        一个包装函数，用于在获取信号量许可后执行 OCR 预测。
-        """
+
+    # 在 ocr_test 内部定义一个计数器，供回调函数使用
+    completed_count = 0
+    total_tasks = 0
+    async def run_ocr_task(image, i_idx, j_idx, inf: BlockType = None):
+        nonlocal completed_count, total_tasks
         async with semaphore:
-            # 确保这里正确地 await 了异步的 predict 方法
             text = await model_manager.ocr_recognizer.predict(image, inf)
+            completed_count += 1
+            # 当任务完成时，调用回调函数
+            if progress_callback:
+                await progress_callback(task_id, completed_count, total_tasks)
+
             return text, i_idx, j_idx
+
     for i in range(len(data)):
         for j in range(len(data[i])):
             if isinstance(data[i][j], dict) and data[i][j]['category_id'] in OCR_TEXT_VALUES:
                 category_id = int(data[i][j]['category_id'])
                 blockquote = BlockType_MEMBER[category_id]
-                # 创建一个任务，这个任务会等待信号量许可
                 task = asyncio.create_task(run_ocr_task(data[i][j]['cropped_image'], i, j, blockquote))
                 ocr_tasks.append(task)
-    # 并发地运行所有 OCR 任务，并等待它们全部完成
-    # results 将是一个列表，包含所有任务的返回值 (text, i_idx, j_idx)
-    # 使用 tqdm_asyncio.gather 来并发地运行任务并显示进度条
-    if ocr_tasks:
-        results = await tqdm_asyncio.gather(
-            *ocr_tasks,
-            total=len(ocr_tasks),  # 设置进度条的总数
-            desc="OCR Progress"  # 进度条的描述信息
-        )
 
-        # 将 OCR 结果填充回原始数据结构
-        for text, i_idx, j_idx in results:
-            data[i_idx][j_idx]['text'] = text
+    total_tasks = len(ocr_tasks)
+    if not ocr_tasks:
+        return data
+
+    results = await tqdm_asyncio.gather(
+        *ocr_tasks,
+        total=total_tasks,
+        desc="OCR Progress"
+    )
+
+    for text, i_idx, j_idx in results:
+        data[i_idx][j_idx]['text'] = text
 
     return data
 
-def read_prediction(data:List[List[Dict[str, Any]]])->List[List[int]]:
+
+def read_prediction(data:List[List[Dict[str, Any]]], task_id = None)->List[List[int]]:
+    if task_id:
+        update_task_progress(task_id, 92, 'processing', '正在计算阅读顺序...')
     page_order = model_manager.read_model.batch_predict(data)
     order_in_list = find_reading_order_index(page_order)
     print(f'阅读顺序索引{order_in_list}')
     return order_in_list
 
 def generate_markdown_document(data: List[List[Dict[str, Any]]], reading_order: List[List[int]],
-                               output_path: str) -> str:
+                               output_path: str, task_id = None) -> str:
     """
     根据 OCR 结果和阅读顺序生成 Markdown 文档并保存。
     Args:
@@ -115,6 +126,8 @@ def generate_markdown_document(data: List[List[Dict[str, Any]]], reading_order: 
         output_path: 最终Markdown文件的保存路径。
     """
     # 检查并创建保存路径的父目录
+    if task_id:
+        update_task_progress(task_id, 95, 'processing', '正在生成md文档...')
     save_root_path = os.path.dirname(output_path)
     images_path = os.path.join(save_root_path, "images")
     prepare_directory(save_root_path)
@@ -159,11 +172,11 @@ def generate_markdown_document(data: List[List[Dict[str, Any]]], reading_order: 
     print(f"Markdown文档已生成并保存到: {output_path}")
     return final_markdown
 
-async def main(path):
+async def main(path, task_id=None):
     sample_path = os.path.join(find_project_root(), path)
     file_name_without_extension, file_extension = os.path.splitext(os.path.basename(sample_path))
-    detections = await layout_prediction(sample_path, bool_ocr=True)
-    page_order = read_prediction(detections)
+    detections = await layout_prediction(sample_path, bool_ocr=True, task_id=task_id)
+    page_order = read_prediction(detections, task_id=task_id)
 
     visualize_path = visualize_document(
         input_path=sample_path,  # 传入原始输入路径

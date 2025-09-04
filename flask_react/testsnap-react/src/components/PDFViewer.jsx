@@ -1,7 +1,7 @@
-import React from 'react';
 import './PDFViewer.css'; // 对应样式文件
+import React from 'react';
 
-const PDFViewer = ({ title = "PDF预览", file, processedFileUrl, downloadLink }) => {
+const PDFViewer = React.memo(({ title = "PDF预览", file, processedFileUrl, downloadLink }) => {
     const renderContent = () => {
         // 如果有处理后的文件URL，优先显示处理后的文件
         if (processedFileUrl) {
@@ -38,6 +38,9 @@ const PDFViewer = ({ title = "PDF预览", file, processedFileUrl, downloadLink }
             </div>
         </div>
     );
-};
+});
+
+// 添加自定义比较函数，确保只有当相关props变化时才重新渲染
+PDFViewer.displayName = 'PDFViewer';
 
 export default PDFViewer;

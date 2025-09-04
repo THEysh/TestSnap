@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react';
 import './Controls.css'; // 对应样式文件
+import React, { useState, useRef } from 'react';
 
-const Controls = ({ onFileUpload, onFileProcess, onClearFile, file, status, progress, fileType }) => {
+const Controls = ({ onFileUpload, onFileProcess, onClearFile, file, status, progress, progressMessage, fileType }) => {
     const [dragActive, setDragActive] = useState(false);
     const fileInputRef = useRef(null);
 
@@ -67,7 +67,7 @@ const Controls = ({ onFileUpload, onFileProcess, onClearFile, file, status, prog
     return (
         <div className="controls">
             <div className="upload-section">
-                <div className="upload-area ${dragActive ? 'dragover' : ''}"
+                <div className={`upload-area ${dragActive ? 'dragover' : ''}`}
                     onDragEnter={handleDrag}
                     onDragLeave={handleDrag}
                     onDragOver={handleDrag}
@@ -96,6 +96,21 @@ const Controls = ({ onFileUpload, onFileProcess, onClearFile, file, status, prog
                         <strong>文件名:</strong> <span>{file.name}</span>
                         <strong>文件大小:</strong> <span>{formatFileSize(file.size)}</span>
                         <strong>文件类型:</strong> <span>{file.type}</span>
+                    </div>
+                </div>
+            )}
+
+            {/* 进度条组件 */}
+            {(status === 'uploading' || status === 'processing') && progress > 0 && (
+                <div className="progress-container">
+                    <div className="progress-bar">
+                        <div 
+                            className="progress-fill"
+                            style={{ width: `${progress}%` }}
+                        />
+                    </div>
+                    <div className="progress-text">
+                        {progressMessage || `${progress.toFixed(2)}%`}
                     </div>
                 </div>
             )}
