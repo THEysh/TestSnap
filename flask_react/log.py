@@ -72,4 +72,4 @@ def complete_task(task_id, result=None, error=None):
 async def handle_progress(task_id, completed_count, total_tasks):
     process = 10+(completed_count/total_tasks)*100*0.8
     if task_id:
-        update_task_progress(task_id, round(process, 2), 'processing', f'任务id:{task_id}...\nOCR处理中...{completed_count}/{total_tasks}')
+        update_task_progress(task_id, round(process, 2), 'processing', f'OCR处理中...{completed_count}/{total_tasks}')
