@@ -17,6 +17,32 @@
   --font-family-mono: 'Consolas', 'Monaco', monospace;
 }
 
+/* 动画效果定义 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInSlideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInSlideLeft {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 确保内容在各种设备上都能良好显示 */
+* {
+  box-sizing: border-box;
+}
+
 /* Markdown容器样式 */
 .markdown-container {
   width: 100%;
@@ -83,8 +109,10 @@
   font-weight: 600;
   white-space: nowrap;
   font-size: 14px;
+  user-select: none;
 }
 
+/* 输入框和按钮样式 */
 .markdown-container #file-path-input {
   flex: 1;
   min-width: 250px;
@@ -99,7 +127,7 @@
 .markdown-container #file-path-input:focus {
   outline: none;
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
   transform: translateY(-1px);
 }
 
@@ -133,7 +161,7 @@
   box-shadow: none;
 }
 
-/* 状态消息样式 - 复用App.css中的样式但添加动画效果 */
+/* 状态消息样式 */
 .markdown-container .status-message {
   margin-top: 12px;
   padding: 12px 16px;
@@ -173,7 +201,8 @@
 }
 
 /* 编辑器和预览面板样式 */
-.markdown-container .editor-pane, .markdown-container .preview-pane {
+.markdown-container .editor-pane,
+.markdown-container .preview-pane {
   flex: 1;
   padding: 20px;
   overflow: hidden;
@@ -187,7 +216,8 @@
 }
 
 /* 面板标题样式 */
-.markdown-container .editor-pane h2, .markdown-container .preview-pane h2 {
+.markdown-container .editor-pane h2,
+.markdown-container .preview-pane h2 {
   margin: 0 0 15px 0;
   color: var(--primary-color);
   font-size: 1.3em;
@@ -195,6 +225,8 @@
   align-items: center;
   gap: 8px;
   font-weight: 600;
+  flex-shrink: 0; /* 防止标题被压缩 */
+  user-select: none;
 }
 
 .markdown-container .editor-pane h2::before {
@@ -220,12 +252,13 @@
   transition: all 0.3s ease;
   background: white;
   line-height: 1.6;
+  overflow-y: auto;
 }
 
 .markdown-container #markdown-input:focus {
   outline: none;
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
   transform: translateY(-1px);
 }
 
@@ -471,53 +504,17 @@
     flex-direction: column;
   }
   
-  /* 调整面板样式 */
+  /* 调整面板样式，确保可以独立滚动 */
   .markdown-container .editor-pane {
     border-right: none;
     border-bottom: 1px solid var(--border-color);
-    min-height: 40vh;
+    height: 50vh;
+    overflow: hidden;
   }
   
   .markdown-container .preview-pane {
-    min-height: 40vh;
-  }
-  
-  /* 调整头部样式 */
-  .markdown-container .header h1 {
-    font-size: 1.8em;
-    margin-bottom: 0.3em;
-  }
-  
-  .markdown-container .header {
-    padding: 15px 10px;
-    min-height: 100px;
-  }
-  
-  /* 调整输入组布局 */
-  .markdown-container .path-input-group {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-  }
-  
-  .markdown-container #file-path-input {
-    min-width: auto;
-  }
-  
-  /* 调整控件区域 */
-  .markdown-container .controls {
-    padding: 10px 15px;
-  }
-  
-  /* 调整面板内边距 */
-  .markdown-container .editor-pane, 
-  .markdown-container .preview-pane {
-    padding: 15px;
-  }
-  
-  /* 调整预览区域 */
-  .markdown-container #preview {
-    padding: 15px;
+    height: 50vh;
+    overflow: hidden;
   }
 }
 
@@ -536,7 +533,7 @@
   }
 }
 
-/* 滚动条美化 - 提供统一的滚动体验 */
+/* 滚动条美化 */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -579,87 +576,223 @@
   background: var(--primary-color);
 }
 
-/* 动画效果定义 */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+/* Markdown 内容样式 - 优化排版和视觉层次 */
+.markdown-container #preview h1,
+.markdown-container #preview h2,
+.markdown-container #preview h3,
+.markdown-container #preview h4,
+.markdown-container #preview h5,
+.markdown-container #preview h6 {
+  margin-top: 1.8em;
+  margin-bottom: 0.8em;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #2c3e50;
+  animation: fadeIn 0.4s ease-out;
 }
 
-@keyframes fadeInSlideUp {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.markdown-container #preview h1 {
+  font-size: 1.8em;
+  border-bottom: 2px solid var(--primary-color);
+  padding-bottom: 0.3em;
+  margin-top: 0.5em;
 }
 
-@keyframes fadeInSlideLeft {
-  from {
-    opacity: 0;
-    transform: translateX(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+.markdown-container #preview h2 {
+  font-size: 1.5em;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.3em;
 }
 
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.markdown-container #preview h3 {
+  font-size: 1.3em;
+  color: var(--primary-dark);
 }
 
-/* 加载动画 */
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
+.markdown-container #preview h4 { font-size: 1.1em; }
+.markdown-container #preview h5 { font-size: 1em; }
+.markdown-container #preview h6 { font-size: 0.9em; color: #666; }
+
+/* 段落样式 */
+.markdown-container #preview p {
+  margin-bottom: 1.2em;
+  line-height: 1.8;
+  color: var(--text-color);
+  animation: fadeIn 0.4s ease-out;
 }
 
-/* 高亮效果 - 用于交互反馈 */
-@keyframes highlight {
-  0% {
-    background-color: rgba(102, 126, 234, 0.2);
+/* 引用样式 */
+.markdown-container #preview blockquote {
+  padding: 15px 20px;
+  margin: 0 0 20px;
+  border-left: 4px solid var(--primary-color);
+  background: #f6f8fa;
+  border-radius: 0 var(--border-radius-sm) var(--border-radius-sm) 0;
+  font-style: italic;
+  animation: fadeInSlideLeft 0.5s ease-out;
+}
+
+/* 代码样式 */
+.markdown-container #preview code {
+  padding: 0.2em 0.4em;
+  background: #f6f8fa;
+  border-radius: 3px;
+  font-size: 85%;
+  color: #d73a49;
+  font-family: var(--font-family-mono);
+  transition: all 0.2s ease;
+}
+
+.markdown-container #preview code:hover {
+  background: #e9ecef;
+}
+
+/* 代码块样式 */
+.markdown-container #preview pre {
+  padding: 16px;
+  background: #2d3748;
+  border-radius: var(--border-radius-sm);
+  overflow: auto;
+  margin-bottom: 16px;
+  position: relative;
+  animation: fadeIn 0.6s ease-out;
+}
+
+.markdown-container #preview pre code {
+  background: transparent;
+  color: #e2e8f0;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* 列表样式 */
+.markdown-container #preview ul,
+.markdown-container #preview ol {
+  padding-left: 1.8em;
+  margin-bottom: 1.5em;
+}
+
+.markdown-container #preview li {
+  margin-bottom: 0.5em;
+  position: relative;
+}
+
+.markdown-container #preview ul li::marker {
+  color: var(--primary-color);
+}
+
+/* 表格样式 */
+.markdown-container #preview table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-bottom: 1.5em;
+  font-size: 0.95em;
+  animation: fadeIn 0.5s ease-out;
+}
+
+.markdown-container #preview th,
+.markdown-container #preview td {
+  padding: 10px 15px;
+  border: 1px solid #d0d7de;
+  text-align: left;
+  transition: background-color 0.2s ease;
+}
+
+.markdown-container #preview th {
+  background: #f6f8fa;
+  font-weight: 600;
+  color: var(--primary-dark);
+}
+
+.markdown-container #preview tr:nth-child(even) {
+  background: #f9fafb;
+}
+
+.markdown-container #preview tr:hover {
+  background: #f0f4ff;
+}
+
+/* 链接样式 */
+.markdown-container #preview a {
+  color: var(--primary-color);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--primary-color);
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.markdown-container #preview a:hover {
+  color: var(--primary-dark);
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+}
+
+/* 水平分割线 */
+.markdown-container #preview hr {
+  height: 2px;
+  padding: 0;
+  margin: 2em 0;
+  background-color: var(--border-color);
+  border: 0;
+  position: relative;
+}
+
+.markdown-container #preview hr::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 60px;
+  height: 4px;
+  background: var(--primary-gradient);
+  border-radius: 2px;
+}
+
+/* 图片样式 */
+.markdown-container #preview img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--border-radius-sm);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin: 1em 0;
+  transition: all 0.3s ease;
+  display: block;
+}
+
+.markdown-container #preview img:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* MathJax 公式样式 - 增强数学公式的视觉效果 */
+.markdown-container .MathJax,
+.markdown-container .MathJax_SVG {
+  font-size: 1.1em !important;
+  transition: opacity 0.3s ease;
+}
+
+.markdown-container mjx-container {
+  margin: 10px 0 !important;
+  animation: fadeIn 0.5s ease-out;
+}
+
+.markdown-container mjx-container[display="true"] {
+  margin: 1.5em 0 !important;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.5em 0;
+  background: rgba(102, 126, 234, 0.05);
+  border-radius: var(--border-radius-sm);
+}
+
+/* 公式缩放优化 - 确保在各种屏幕尺寸上都易于阅读 */
+@media (max-width: 480px) {
+  .markdown-container .MathJax,
+  .markdown-container .MathJax_SVG {
+    font-size: 1em !important;
   }
-  100% {
-    background-color: transparent;
-  }
-}
-
-/* 为可交互元素添加焦点样式 */
-.markdown-container #file-path-input:focus,
-.markdown-container #markdown-input:focus {
-  outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
-}
-
-/* 防止文本选中时的默认样式影响UI */
-.markdown-container .path-input-group label,
-.markdown-container .header h1,
-.markdown-container .header p {
-  user-select: none;
-}
-
-/* 确保内容在各种设备上都能良好显示 */
-* {
-  box-sizing: border-box;
 }
 
 /* 打印样式优化 */

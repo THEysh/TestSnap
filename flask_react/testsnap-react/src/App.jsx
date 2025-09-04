@@ -3,266 +3,110 @@ import Controls from './components/Controls';
 import PDFViewer from './components/PDFViewer';
 import ImageViewer from './components/ImageViewer';
 import MarkdownViewer from './components/MarkdownViewer';
-import './App.css'; // 使用模块化的CSS，或者直接放在App.css中
+import './App.css';
 import React, { useState } from 'react';
+import useFileUpload from './hooks/useFileUpload';
+import useFileProcess from './hooks/useFileProcess';
+
 function App() {
-    const [file, setFile] = useState(null);
-    const [status, setStatus] = useState('idle'); // idle, uploaded, processing, success, error
-    const [progress, setProgress] = useState(0);
-    const [processedFileUrl, setProcessedFileUrl] = useState(null);
-    const [processedFileUrlRef, setProcessedFileUrlRef] = useState(null); // 新增：用于跟踪上一个URL
-    const [downloadLink, setDownloadLink] = useState(null);
-    const [fileType, setFileType] = useState(''); // pdf 或 image
-    const [uploadedFileInfo, setUploadedFileInfo] = useState(null); // 存储上传后的文件信息
-    const [autoLoadMarkdownPath, setAutoLoadMarkdownPath] = useState(null); // 自动加载的Markdown文件路径
-    const [progressMessage, setProgressMessage] = useState(''); // 新增：存储进度消息
-
-    // 新增：安全地更新processedFileUrl的函数
-    const setProcessedFileUrlSafely = (newUrl) => {
-        // 只有当新URL与当前URL不同时才更新
-        if (newUrl !== processedFileUrlRef) {
-            setProcessedFileUrl(newUrl);
-            setProcessedFileUrlRef(newUrl);
-        }
-    };
-
-    // 仅负责上传文件的函数
-    const handleUploadFile = async (uploadedFile) => {
-        setFile(uploadedFile);
-        setStatus('uploading');
-        setProgress(0);
-        setProgressMessage('');
-        setProcessedFileUrl(null);
-        setProcessedFileUrlRef(null); // 重置引用
-        setDownloadLink(null);
-        setUploadedFileInfo(null);
-        // 设置文件类型
-        const isPdf = uploadedFile.type.includes('pdf');
-        setFileType(isPdf ? 'pdf' : 'image');
-        try {
-            // 上传文件
-            const uploadFormData = new FormData();
-            uploadFormData.append('file', uploadedFile);
-
-            // 根据文件类型选择不同的上传API
-            const uploadUrl = isPdf 
-                ? 'http://localhost:7861/api/pdf/upload' 
-                : 'http://localhost:7861/api/image/upload';
-
-            const uploadResponse = await new Promise((resolve, reject) => {
-                const xhr = new XMLHttpRequest();
-                xhr.upload.addEventListener('progress', (e) => {
-                    if (e.lengthComputable) {
-                        const percent = (e.loaded / e.total) * 100;
-                        setProgress(percent);
-                        setProgressMessage(`上传中: ${percent.toFixed(2)}%`);
-                    }
-                });
-                xhr.onload = () => {
-                    if (xhr.status === 200) {
-                        resolve(JSON.parse(xhr.responseText));
-                    } else {
-                        reject(new Error(`上传失败: ${xhr.status}`));
-                    }
-                };
-                xhr.onerror = () => reject(new Error('网络错误'));
-                xhr.open('POST', uploadUrl);
-                xhr.send(uploadFormData);
-            });
-
-            if (!uploadResponse.success) {
-                throw new Error(uploadResponse.message || '文件上传失败');
-            }
-            // 文件上传成功后，存储文件信息并等待用户手动触发处理
-            setStatus('uploaded');
-            setUploadedFileInfo(uploadResponse.file_info);
-            setProgress(100);
-            setProgressMessage('上传完成');
-
-        } catch (error) {
-            console.error('上传失败:', error);
-            setStatus('error');
-            setProgressMessage('上传失败');
-            setProcessedFileUrl(null);
-        }
-    };
-// 定义在 handleProcessFile 外面，全局共享
-let checkProgress = null;
-let timeout = null;
-// 统一清理函数
-const stopPolling = () => {
-    if (checkProgress) {
-        clearInterval(checkProgress);
-        checkProgress = null;
-    }
-    if (timeout) {
-        clearTimeout(timeout);
-        timeout = null;
-    }
-};
-
-// 处理已上传文件的函数
-const handleProcessFile = async () => {
-    if (!uploadedFileInfo || !file) {
-        return;
-    }
-
-    setStatus('processing');
-    setProgress(0); // 重置进度
-    setProgressMessage('');
+  const [file, setFile] = useState(null);
+  const [fileType, setFileType] = useState('');
+  
+  // 使用自定义Hooks
+  const { 
+    status: uploadStatus, 
+    progress: uploadProgress, // 修复：将progress重命名为uploadProgress
+    uploadedFileInfo, 
+    error: uploadError, // 修复：将error重命名为uploadError
+    handleUpload, 
+    reset: resetUpload 
+  } = useFileUpload();
+  
+  const { 
+    status: processStatus, 
+    progress, 
+    progressMessage, 
+    processedFileUrl, 
+    downloadLink, 
+    autoLoadMarkdownPath, 
+    error: processError, // 修复：将error重命名为processError
+    process, 
+    reset: resetProcess 
+  } = useFileProcess();
+  
+  // 处理文件上传
+  const handleFileUpload = async (uploadedFile) => {
+    // 在上传新文件前重置处理状态
+    resetProcess();
+    setFile(uploadedFile);
     
-    try {
-        // 处理文件
-        const isPdf = file.type.includes('pdf');
-        const processUrl = isPdf 
-            ? 'http://localhost:7861/api/pdf/process' 
-            : 'http://localhost:7861/api/image/process';
-        
-        const processResponse = await fetch(processUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ filename: uploadedFileInfo.unique_filename }),
-        });
-        
-        if (!processResponse.ok) {
-            throw new Error(`处理请求失败: ${processResponse.status}`);
-        }
-        
-        const processResult = await processResponse.json();
-        if (!processResult.success || !processResult.task_id) {
-            throw new Error(processResult.error || '启动处理失败');
-        }
-        
-        const { task_id } = processResult;
-        console.log(`任务已启动，ID: ${task_id}`);
-
-        // 启动轮询
-        checkProgress = setInterval(async () => {
-            try {
-                const progResponse = await fetch(`http://localhost:7861/api/task/progress/${task_id}`);
-                if (!progResponse.ok) {
-                    console.error(`获取进度失败: ${progResponse.status}`);
-                    return;
-                }
-                
-                const progress = await progResponse.json();
-                if (!progress.success) {
-                    console.error('获取进度失败:', progress.error);
-                    stopPolling();
-                    setStatus('error');
-                    setProgressMessage('获取进度失败');
-                    return;
-                }
-                
-                setProgress(progress.progress || 0);
-                setProgressMessage(progress.message || '处理中...');
-                console.log(`进度: ${progress.progress}% - ${progress.message || ''}`);
-                
-                if (progress.status === 'completed') {
-                    stopPolling(); // ✅ 拿到结果立即停掉轮询
-                    console.log('处理完成!', progress.result);
-
-                    if (!progress.result || !progress.result.success) {
-                        throw new Error(progress.result?.error || '处理结果无效');
-                    }
-                    const result = progress.result;
-                    // 转换路径
-                    const processedPath = result.processed_file.replace(/\\/g, '/'); 
-                    const processed_md_path = result.md_path.replace(/\\/g, '/');
-                    const newProcessedFileUrl = `http://localhost:7861/api/files/${encodeURIComponent(processedPath)}`;
-                    setProcessedFileUrlSafely(newProcessedFileUrl); // 使用安全更新函数
-                    const filename = processedPath.split('/').pop();
-                    setDownloadLink(filename);
-                    setAutoLoadMarkdownPath(processed_md_path);
-                    setStatus('completed');
-                    setProgress(100);
-                    setProgressMessage('处理完成');
-
-                } else if (progress.status === 'failed') {
-                    stopPolling(); // ✅ 失败时也要停掉
-                    console.error('处理失败:', progress.message);
-                    setStatus('error');
-                    setProgress(0);
-                    setProgressMessage(`处理失败: ${progress.message || '未知错误'}`);
-                    setProcessedFileUrl(null);
-                    setProcessedFileUrlRef(null); // 修复：添加重置引用
-                }
-                // processing 情况下继续轮询
-                
-            } catch (pollError) {
-                console.error('轮询进度时出错:', pollError);
-            }
-        }, 2000);
-
-        // 设置超时，避免无限轮询
-        timeout = setTimeout(() => {
-            stopPolling();
-            console.error('处理超时');
-            setStatus('error');
-            setProgress(0);
-            setProgressMessage('处理超时');
-        }, 5 * 60 * 1000); // 5分钟超时
-
-    } catch (error) {
-        stopPolling(); // ✅ 出现异常也要清理
-        console.error('处理失败:', error);
-        setStatus('error');
-        setProgress(0);
-        setProgressMessage(`处理失败: ${error.message}`);
-        setProcessedFileUrl(null);
-        setProcessedFileUrlRef(null); // 重置引用
+    const result = await handleUpload(uploadedFile);
+    if (result.success) {
+      setFileType(result.fileType);
     }
-};
-    const handleClearFile = () => {
-        setFile(null);
-        setStatus('idle');
-        setProgress(0);
-        setProgressMessage('');
-        setProcessedFileUrl(null);
-        setProcessedFileUrlRef(null); // 重置引用
-        setDownloadLink(null);
-        setFileType('');
-        setUploadedFileInfo(null);
-    };
+  };
+  
+  // 处理文件处理
+  const handleProcessFile = async () => {
+    if (!uploadedFileInfo || !file) {
+      return;
+    }
+    
+    await process(uploadedFileInfo.unique_filename, fileType === 'pdf');
+  };
+  
+  // 清除文件
+  const handleClearFile = () => {
+    setFile(null);
+    setFileType('');
+    resetUpload();
+    resetProcess();
+  };
 
-    return (
-        <div className="container">
-            <Header />
-            <Controls
-                onFileUpload={handleUploadFile}
-                onFileProcess={handleProcessFile}
-                onClearFile={handleClearFile}
-                file={file}
-                status={status}
-                progress={progress}
-                progressMessage={progressMessage}
-                fileType={fileType}
-            />
-            <div className="pdf-container">
-                {fileType === 'pdf' ? (
-                    <PDFViewer
-                        title="PDF预览"
-                        file={file}
-                        processedFileUrl={processedFileUrl}
-                        downloadLink={downloadLink}
-                    />
-                ) : fileType === 'image' ? (
-                    <ImageViewer
-                        file={file}
-                        processedFileUrl={processedFileUrl}
-                    />
-                ) : (
-                    <div className="viewer-placeholder">
-                        <div className="placeholder-icon">📄/🖼️</div>
-                        <p>请上传PDF或图片文件</p>
-                    </div>
-                )}
-            </div>
-            <div className="markdown-container">
-                <MarkdownViewer autoLoadPath={autoLoadMarkdownPath} />
-            </div>
-        </div>
-    );
+  // 确定当前状态
+  const getCurrentStatus = () => {
+    if (processStatus !== 'idle') return processStatus;
+    return uploadStatus;
+  };
+
+  return (
+    <div className="container">
+      <Header />
+      <Controls
+        onFileUpload={handleFileUpload}
+        onFileProcess={handleProcessFile}
+        onClearFile={handleClearFile}
+        file={file}
+        status={getCurrentStatus()}
+        progress={progress || uploadProgress}
+        progressMessage={progressMessage}
+        fileType={fileType}
+      />
+      <div className="pdf-container">
+        {fileType === 'pdf' ? (
+          <PDFViewer
+            title="PDF预览"
+            file={file}
+            processedFileUrl={processedFileUrl}
+            downloadLink={downloadLink}
+          />
+        ) : fileType === 'image' ? (
+          <ImageViewer
+            file={file}
+            processedFileUrl={processedFileUrl}
+          />
+        ) : (
+          <div className="viewer-placeholder">
+            <div className="placeholder-icon">📄/🖼️</div>
+            <p>请上传PDF或图片文件</p>
+          </div>
+        )}
+      </div>
+      <div className="markdown-container">
+        <MarkdownViewer autoLoadPath={autoLoadMarkdownPath} />
+      </div>
+    </div>
+  );
 }
 
 export default App;
