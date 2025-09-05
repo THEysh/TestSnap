@@ -45,7 +45,8 @@ const Controls = ({ onFileUpload, onFileProcess, onClearFile, file, status, prog
           <div className="upload-text">点击选择文件或拖拽到此处</div>
           <div className="upload-hint">支持PDF和常见图片格式，最大50MB</div>
         </div>
-        <ModelConfig />
+        <ModelConfig className="model-config"/>
+
         <input
           type="file"
           id="file-input"

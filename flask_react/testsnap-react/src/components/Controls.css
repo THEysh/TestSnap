@@ -14,8 +14,11 @@
     min-height: 400px;
 }
 
-.upload-section .upload-area {
-    flex: 1;
+.upload-area {
+    flex: 7;
+}
+.model-config {
+    flex: 3;
 }
 
 .upload-area {
