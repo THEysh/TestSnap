@@ -4,7 +4,6 @@ import React, { useState, useRef } from 'react';
 const Controls = ({ onFileUpload, onFileProcess, onClearFile, file, status, progress, progressMessage, fileType }) => {
     const [dragActive, setDragActive] = useState(false);
     const fileInputRef = useRef(null);
-
     const handleFileChange = (e) => {
         const selectedFile = e.target.files[0];
         if (selectedFile) {
@@ -100,8 +99,8 @@ const Controls = ({ onFileUpload, onFileProcess, onClearFile, file, status, prog
                 </div>
             )}
 
-            {/* 进度条组件 */}
-            {(status === 'uploading' || status === 'processing') && progress > 0 && (
+            {/* 进度条组件 - 只显示处理阶段进度 */}
+            {status === 'processing' && progress > 0 && (
                 <div className="progress-container">
                     <div className="progress-bar">
                         <div 

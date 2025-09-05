@@ -15,9 +15,7 @@ function App() {
   // 使用自定义Hooks
   const { 
     status: uploadStatus, 
-    progress: uploadProgress, // 修复：将progress重命名为uploadProgress
     uploadedFileInfo, 
-    error: uploadError, // 修复：将error重命名为uploadError
     handleUpload, 
     reset: resetUpload 
   } = useFileUpload();
@@ -29,7 +27,6 @@ function App() {
     processedFileUrl, 
     downloadLink, 
     autoLoadMarkdownPath, 
-    error: processError, // 修复：将error重命名为processError
     process, 
     reset: resetProcess 
   } = useFileProcess();
@@ -78,7 +75,7 @@ function App() {
         onClearFile={handleClearFile}
         file={file}
         status={getCurrentStatus()}
-        progress={progress || uploadProgress}
+        progress={progress}
         progressMessage={progressMessage}
         fileType={fileType}
       />

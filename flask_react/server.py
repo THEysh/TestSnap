@@ -377,7 +377,7 @@ def process_file_async(filename, file_type):
             return {'success': False, 'error': '文件不存在'}
 
         # 生成任务ID
-        task_id = f"{file_type}_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}"
+        task_id = f"{file_type}_{int(time.time() * 1000)}_{uuid.uuid4().hex[:4]}"
 
         # 初始化任务进度
         TASK_PROCESS[task_id] = {
