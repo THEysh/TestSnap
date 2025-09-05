@@ -83,7 +83,7 @@ const useFileProcess = () => {
         } catch (err) {
           console.error('轮询进度时出错:', err);
         }
-      }, 2000);
+      }, 1000);
 
       // 设置超时
       timeout = setTimeout(() => {
