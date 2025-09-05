@@ -1,4 +1,4 @@
-/* 定义CSS变量，便于统一管理和维护 */
+/* 简化MarkdownViewer.css，移除重复样式 */
 :root {
   --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   --primary-color: #667eea;
@@ -18,30 +18,13 @@
 }
 
 /* 动画效果定义 */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeInSlideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeInSlideLeft { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes slideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
-@keyframes fadeInSlideUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fadeInSlideLeft {
-  from { opacity: 0; transform: translateX(20px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes slideIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* 确保内容在各种设备上都能良好显示 */
-* {
-  box-sizing: border-box;
-}
+/* 基础样式 */
+* { box-sizing: border-box; }
 
 /* Markdown容器样式 */
 .markdown-container {
@@ -70,15 +53,6 @@
   justify-content: center;
 }
 
-.markdown-container .header h1 {
-  font-size: 2.2em;
-  margin-bottom: 0.5em;
-  position: relative;
-  z-index: 1;
-  line-height: 1.2;
-  animation: fadeIn 0.6s ease-out;
-}
-
 .markdown-container .header p {
   opacity: var(--text-light);
   font-size: 1.1em;
@@ -102,14 +76,6 @@
   align-items: center;
   flex-wrap: wrap;
   animation: slideIn 0.5s ease-out;
-}
-
-.markdown-container .path-input-group label {
-  color: var(--primary-color);
-  font-weight: 600;
-  white-space: nowrap;
-  font-size: 14px;
-  user-select: none;
 }
 
 /* 输入框和按钮样式 */
@@ -150,10 +116,6 @@
   box-shadow: var(--shadow-md);
 }
 
-.markdown-container #load-button:active:not(:disabled) {
-  transform: translateY(0);
-}
-
 .markdown-container #load-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -167,30 +129,12 @@
   padding: 12px 16px;
   border-radius: var(--border-radius-sm);
   font-size: 14px;
-  display: none;
   animation: fadeInSlideUp 0.3s ease;
 }
 
-.markdown-container .status-success {
-  background: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
-  display: block;
-}
-
-.markdown-container .status-error {
-  background: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
-  display: block;
-}
-
-.markdown-container .status-loading {
-  background: #d1ecf1;
-  color: #0c5460;
-  border: 1px solid #bee5eb;
-  display: block;
-}
+.markdown-container .status-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+.markdown-container .status-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+.markdown-container .status-loading { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
 
 /* 编辑器容器样式 */
 .markdown-container .editor-container {
@@ -225,19 +169,12 @@
   align-items: center;
   gap: 8px;
   font-weight: 600;
-  flex-shrink: 0; /* 防止标题被压缩 */
+  flex-shrink: 0;
   user-select: none;
 }
 
-.markdown-container .editor-pane h2::before {
-  content: '✏️';
-  font-size: 1.1em;
-}
-
-.markdown-container .preview-pane h2::before {
-  content: '👁️';
-  font-size: 1.1em;
-}
+.markdown-container .editor-pane h2::before { content: '✏️'; font-size: 1.1em; }
+.markdown-container .preview-pane h2::before { content: '👁️'; font-size: 1.1em; }
 
 /* Markdown输入框样式 */
 .markdown-container #markdown-input {
@@ -273,52 +210,26 @@
   animation: fadeIn 0.5s ease;
 }
 
-/* Markdown 内容样式 - 优化排版和视觉层次 */
+/* Markdown内容样式 */
 .markdown-container #preview h1, 
 .markdown-container #preview h2, 
-.markdown-container #preview h3, 
-.markdown-container #preview h4, 
-.markdown-container #preview h5, 
-.markdown-container #preview h6 {
+.markdown-container #preview h3 {
   margin-top: 1.8em;
   margin-bottom: 0.8em;
   font-weight: 600;
   line-height: 1.3;
-  color: #2c3e50;
   animation: fadeIn 0.4s ease-out;
 }
 
-.markdown-container #preview h1 {
-  font-size: 1.8em;
-  border-bottom: 2px solid var(--primary-color);
-  padding-bottom: 0.3em;
-  margin-top: 0.5em;
-}
-
-.markdown-container #preview h2 {
-  font-size: 1.5em;
-  border-bottom: 1px solid var(--border-color);
-  padding-bottom: 0.3em;
-}
-
-.markdown-container #preview h3 { 
-  font-size: 1.3em; 
-  color: var(--primary-dark);
-}
-
-.markdown-container #preview h4 { font-size: 1.1em; }
-.markdown-container #preview h5 { font-size: 1em; }
+.markdown-container #preview h1 { font-size: 1.8em; border-bottom: 2px solid var(--primary-color); padding-bottom: 0.3em; margin-top: 0.5em; color: #2c3e50; }
+.markdown-container #preview h2 { font-size: 1.5em; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3em; color: #2c3e50; }
+.markdown-container #preview h3 { font-size: 1.3em; color: var(--primary-dark); }
+.markdown-container #preview h4 { font-size: 1.1em; color: #2c3e50; }
+.markdown-container #preview h5 { font-size: 1em; color: #2c3e50; }
 .markdown-container #preview h6 { font-size: 0.9em; color: #666; }
 
-/* 段落样式 */
-.markdown-container #preview p {
-  margin-bottom: 1.2em;
-  line-height: 1.8;
-  color: var(--text-color);
-  animation: fadeIn 0.4s ease-out;
-}
+.markdown-container #preview p { margin-bottom: 1.2em; line-height: 1.8; color: var(--text-color); animation: fadeIn 0.4s ease-out; }
 
-/* 引用样式 */
 .markdown-container #preview blockquote {
   padding: 15px 20px;
   margin: 0 0 20px;
@@ -329,7 +240,6 @@
   animation: fadeInSlideLeft 0.5s ease-out;
 }
 
-/* 代码样式 */
 .markdown-container #preview code {
   padding: 0.2em 0.4em;
   background: #f6f8fa;
@@ -340,11 +250,6 @@
   transition: all 0.2s ease;
 }
 
-.markdown-container #preview code:hover {
-  background: #e9ecef;
-}
-
-/* 代码块样式 */
 .markdown-container #preview pre {
   padding: 16px;
   background: #2d3748;
@@ -369,14 +274,8 @@
   margin-bottom: 1.5em;
 }
 
-.markdown-container #preview li {
-  margin-bottom: 0.5em;
-  position: relative;
-}
-
-.markdown-container #preview ul li::marker {
-  color: var(--primary-color);
-}
+.markdown-container #preview li { margin-bottom: 0.5em; position: relative; }
+.markdown-container #preview ul li::marker { color: var(--primary-color); }
 
 /* 表格样式 */
 .markdown-container #preview table {
@@ -394,19 +293,9 @@
   transition: background-color 0.2s ease;
 }
 
-.markdown-container #preview th {
-  background: #f6f8fa;
-  font-weight: 600;
-  color: var(--primary-dark);
-}
-
-.markdown-container #preview tr:nth-child(even) {
-  background: #f9fafb;
-}
-
-.markdown-container #preview tr:hover {
-  background: #f0f4ff;
-}
+.markdown-container #preview th { background: #f6f8fa; font-weight: 600; color: var(--primary-dark); }
+.markdown-container #preview tr:nth-child(even) { background: #f9fafb; }
+.markdown-container #preview tr:hover { background: #f0f4ff; }
 
 /* 链接样式 */
 .markdown-container #preview a {
@@ -417,11 +306,7 @@
   position: relative;
 }
 
-.markdown-container #preview a:hover {
-  color: var(--primary-dark);
-  border-bottom-style: solid;
-  border-bottom-width: 2px;
-}
+.markdown-container #preview a:hover { color: var(--primary-dark); border-bottom-style: solid; border-bottom-width: 2px; }
 
 /* 水平分割线 */
 .markdown-container #preview hr {
@@ -456,12 +341,9 @@
   display: block;
 }
 
-.markdown-container #preview img:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
-}
+.markdown-container #preview img:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15); }
 
-/* MathJax 公式样式 - 增强数学公式的视觉效果 */
+/* MathJax公式样式 */
 .markdown-container .MathJax, 
 .markdown-container .MathJax_SVG {
   font-size: 1.1em !important;
@@ -482,77 +364,11 @@
   border-radius: var(--border-radius-sm);
 }
 
-/* 公式缩放优化 - 确保在各种屏幕尺寸上都易于阅读 */
-@media (max-width: 480px) {
-  .markdown-container .MathJax, 
-  .markdown-container .MathJax_SVG {
-    font-size: 1em !important;
-  }
-}
-
-/* 响应式设计 - 优化不同屏幕尺寸的布局 */
-@media (max-width: 768px) {
-  /* 调整容器高度 */
-  .markdown-container {
-    height: 100vh;
-    margin: 0;
-    border-radius: 0;
-  }
-  
-  /* 编辑器容器改为垂直排列 */
-  .markdown-container .editor-container {
-    flex-direction: column;
-  }
-  
-  /* 调整面板样式，确保可以独立滚动 */
-  .markdown-container .editor-pane {
-    border-right: none;
-    border-bottom: 1px solid var(--border-color);
-    height: 50vh;
-    overflow: hidden;
-  }
-  
-  .markdown-container .preview-pane {
-    height: 50vh;
-    overflow: hidden;
-  }
-}
-
-/* 平板设备优化 */
-@media (min-width: 769px) and (max-width: 1024px) {
-  .markdown-container .header h1 {
-    font-size: 2em;
-  }
-  
-  .markdown-container .path-input-group {
-    gap: 10px;
-  }
-  
-  .markdown-container #file-path-input {
-    min-width: 200px;
-  }
-}
-
 /* 滚动条美化 */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 4px;
-  transition: background-color 0.3s ease;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--primary-color);
-}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; transition: background-color 0.3s ease; }
+::-webkit-scrollbar-thumb:hover { background: var(--primary-color); }
 
 /* 为编辑器和预览区域自定义滚动条 */
 .markdown-container #markdown-input::-webkit-scrollbar,
@@ -576,223 +392,37 @@
   background: var(--primary-color);
 }
 
-/* Markdown 内容样式 - 优化排版和视觉层次 */
-.markdown-container #preview h1,
-.markdown-container #preview h2,
-.markdown-container #preview h3,
-.markdown-container #preview h4,
-.markdown-container #preview h5,
-.markdown-container #preview h6 {
-  margin-top: 1.8em;
-  margin-bottom: 0.8em;
-  font-weight: 600;
-  line-height: 1.3;
-  color: #2c3e50;
-  animation: fadeIn 0.4s ease-out;
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .markdown-container {
+    height: 100vh;
+    margin: 0;
+    border-radius: 0;
+  }
+  
+  .markdown-container .editor-container { flex-direction: column; }
+  
+  .markdown-container .editor-pane {
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+    height: 50vh;
+    overflow: hidden;
+  }
+  
+  .markdown-container .preview-pane { height: 50vh; overflow: hidden; }
 }
 
-.markdown-container #preview h1 {
-  font-size: 1.8em;
-  border-bottom: 2px solid var(--primary-color);
-  padding-bottom: 0.3em;
-  margin-top: 0.5em;
-}
-
-.markdown-container #preview h2 {
-  font-size: 1.5em;
-  border-bottom: 1px solid var(--border-color);
-  padding-bottom: 0.3em;
-}
-
-.markdown-container #preview h3 {
-  font-size: 1.3em;
-  color: var(--primary-dark);
-}
-
-.markdown-container #preview h4 { font-size: 1.1em; }
-.markdown-container #preview h5 { font-size: 1em; }
-.markdown-container #preview h6 { font-size: 0.9em; color: #666; }
-
-/* 段落样式 */
-.markdown-container #preview p {
-  margin-bottom: 1.2em;
-  line-height: 1.8;
-  color: var(--text-color);
-  animation: fadeIn 0.4s ease-out;
-}
-
-/* 引用样式 */
-.markdown-container #preview blockquote {
-  padding: 15px 20px;
-  margin: 0 0 20px;
-  border-left: 4px solid var(--primary-color);
-  background: #f6f8fa;
-  border-radius: 0 var(--border-radius-sm) var(--border-radius-sm) 0;
-  font-style: italic;
-  animation: fadeInSlideLeft 0.5s ease-out;
-}
-
-/* 代码样式 */
-.markdown-container #preview code {
-  padding: 0.2em 0.4em;
-  background: #f6f8fa;
-  border-radius: 3px;
-  font-size: 85%;
-  color: #d73a49;
-  font-family: var(--font-family-mono);
-  transition: all 0.2s ease;
-}
-
-.markdown-container #preview code:hover {
-  background: #e9ecef;
-}
-
-/* 代码块样式 */
-.markdown-container #preview pre {
-  padding: 16px;
-  background: #2d3748;
-  border-radius: var(--border-radius-sm);
-  overflow: auto;
-  margin-bottom: 16px;
-  position: relative;
-  animation: fadeIn 0.6s ease-out;
-}
-
-.markdown-container #preview pre code {
-  background: transparent;
-  color: #e2e8f0;
-  padding: 0;
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-/* 列表样式 */
-.markdown-container #preview ul,
-.markdown-container #preview ol {
-  padding-left: 1.8em;
-  margin-bottom: 1.5em;
-}
-
-.markdown-container #preview li {
-  margin-bottom: 0.5em;
-  position: relative;
-}
-
-.markdown-container #preview ul li::marker {
-  color: var(--primary-color);
-}
-
-/* 表格样式 */
-.markdown-container #preview table {
-  border-collapse: collapse;
-  width: 100%;
-  margin-bottom: 1.5em;
-  font-size: 0.95em;
-  animation: fadeIn 0.5s ease-out;
-}
-
-.markdown-container #preview th,
-.markdown-container #preview td {
-  padding: 10px 15px;
-  border: 1px solid #d0d7de;
-  text-align: left;
-  transition: background-color 0.2s ease;
-}
-
-.markdown-container #preview th {
-  background: #f6f8fa;
-  font-weight: 600;
-  color: var(--primary-dark);
-}
-
-.markdown-container #preview tr:nth-child(even) {
-  background: #f9fafb;
-}
-
-.markdown-container #preview tr:hover {
-  background: #f0f4ff;
-}
-
-/* 链接样式 */
-.markdown-container #preview a {
-  color: var(--primary-color);
-  text-decoration: none;
-  border-bottom: 1px dotted var(--primary-color);
-  transition: all 0.3s ease;
-  position: relative;
-}
-
-.markdown-container #preview a:hover {
-  color: var(--primary-dark);
-  border-bottom-style: solid;
-  border-bottom-width: 2px;
-}
-
-/* 水平分割线 */
-.markdown-container #preview hr {
-  height: 2px;
-  padding: 0;
-  margin: 2em 0;
-  background-color: var(--border-color);
-  border: 0;
-  position: relative;
-}
-
-.markdown-container #preview hr::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 60px;
-  height: 4px;
-  background: var(--primary-gradient);
-  border-radius: 2px;
-}
-
-/* 图片样式 */
-.markdown-container #preview img {
-  max-width: 100%;
-  height: auto;
-  border-radius: var(--border-radius-sm);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  margin: 1em 0;
-  transition: all 0.3s ease;
-  display: block;
-}
-
-.markdown-container #preview img:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
-}
-
-/* MathJax 公式样式 - 增强数学公式的视觉效果 */
-.markdown-container .MathJax,
-.markdown-container .MathJax_SVG {
-  font-size: 1.1em !important;
-  transition: opacity 0.3s ease;
-}
-
-.markdown-container mjx-container {
-  margin: 10px 0 !important;
-  animation: fadeIn 0.5s ease-out;
-}
-
-.markdown-container mjx-container[display="true"] {
-  margin: 1.5em 0 !important;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 0.5em 0;
-  background: rgba(102, 126, 234, 0.05);
-  border-radius: var(--border-radius-sm);
-}
-
-/* 公式缩放优化 - 确保在各种屏幕尺寸上都易于阅读 */
 @media (max-width: 480px) {
-  .markdown-container .MathJax,
+  .markdown-container .MathJax, 
   .markdown-container .MathJax_SVG {
     font-size: 1em !important;
   }
+}
+
+/* 平板设备优化 */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .markdown-container .path-input-group { gap: 10px; }
+  .markdown-container #file-path-input { min-width: 200px; }
 }
 
 /* 打印样式优化 */
@@ -803,15 +433,9 @@
     margin: 0;
   }
   
-  .markdown-container .controls {
-    display: none;
-  }
+  .markdown-container .controls { display: none; }
   
-  .markdown-container .editor-container {
-    flex-direction: column;
-  }
+  .markdown-container .editor-container { flex-direction: column; }
   
-  .markdown-container .editor-pane {
-    display: none;
-  }
+  .markdown-container .editor-pane { display: none; }
 }
