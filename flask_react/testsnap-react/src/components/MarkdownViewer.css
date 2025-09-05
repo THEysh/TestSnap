@@ -33,8 +33,6 @@
   background: var(--bg-color);
   border-radius: var(--border-radius);
   box-shadow: var(--shadow-lg);
-  overflow: hidden;
-  height: calc(100vh - 40px);
   display: flex;
   flex-direction: column;
 }
@@ -82,6 +80,7 @@
 .markdown-container #file-path-input {
   flex: 1;
   min-width: 250px;
+  color: var(--text-color);
   padding: 10px 15px;
   border: 2px solid var(--border-color);
   border-radius: var(--border-radius-sm);
@@ -139,9 +138,7 @@
 /* 编辑器容器样式 */
 .markdown-container .editor-container {
   display: flex;
-  flex: 1;
-  overflow: hidden;
-  min-height: 0;
+  position: relative;
 }
 
 /* 编辑器和预览面板样式 */
@@ -149,9 +146,10 @@
 .markdown-container .preview-pane {
   flex: 1;
   padding: 20px;
-  overflow: hidden;
+  max-width: 50%;
   display: flex;
   flex-direction: column;
+
 }
 
 .markdown-container .editor-pane {
@@ -178,18 +176,15 @@
 
 /* Markdown输入框样式 */
 .markdown-container #markdown-input {
-  width: 100%;
   flex: 1;
-  padding: 15px;
-  border: 2px solid var(--border-color);
-  border-radius: var(--border-radius-sm);
-  font-family: var(--font-family-mono);
-  font-size: 14px;
-  resize: none;
-  transition: all 0.3s ease;
+  height: 100%;
+  padding: 20px;
   background: white;
-  line-height: 1.6;
+  color: var(--text-color);
+  border-radius: var(--border-radius-sm);
   overflow-y: auto;
+  border: 1px solid var(--border-color);
+  animation: fadeIn 0.5s ease;
 }
 
 .markdown-container #markdown-input:focus {
@@ -202,8 +197,10 @@
 /* 预览区域样式 */
 .markdown-container #preview {
   flex: 1;
+  height: 100%;
   padding: 20px;
   background: white;
+  color: var(--text-color);
   border-radius: var(--border-radius-sm);
   overflow-y: auto;
   border: 1px solid var(--border-color);
@@ -347,12 +344,17 @@
 .markdown-container .MathJax, 
 .markdown-container .MathJax_SVG {
   font-size: 1.1em !important;
+  color: var(--text-color) !important;
   transition: opacity 0.3s ease;
 }
 
 .markdown-container mjx-container {
   margin: 10px 0 !important;
   animation: fadeIn 0.5s ease-out;
+}
+
+.markdown-container mjx-container * {
+  color: var(--text-color) !important;
 }
 
 .markdown-container mjx-container[display="true"] {
@@ -392,50 +394,72 @@
   background: var(--primary-color);
 }
 
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .markdown-container {
-    height: 100vh;
     margin: 0;
     border-radius: 0;
   }
   
-  .markdown-container .editor-container { flex-direction: column; }
-  
-  .markdown-container .editor-pane {
-    border-right: none;
+  .markdown-container .editor-container {
+    flex-direction: column;
+  }
+  .markdown-container .editor-pane,
+  .markdown-container .preview-pane {
+    max-width: 100%; 
+    flex: 1;
+    min-height: 450px; 
     border-bottom: 1px solid var(--border-color);
-    height: 50vh;
-    overflow: hidden;
+  }
+  .markdown-container #markdown-input {
+    width: 100%;
+    height: auto; 
+
+    box-sizing: border-box;
+    resize: none;
+  }
+
+}
+
+/* 优化后的小屏幕样式 */
+@media (max-width: 480px) {
+  /*
+    直接针对 MathJax 容器进行字体大小调整和颜色设置，
+    确保在小屏幕设备上文字清晰可见。
+  */
+  .markdown-container .MathJax,
+  .markdown-container .MathJax_SVG,
+  .markdown-container mjx-container {
+    font-size: 1em !important;
+    color: var(--text-color) !important;
   }
   
-  .markdown-container .preview-pane { height: 50vh; overflow: hidden; }
-}
-
-@media (max-width: 480px) {
-  .markdown-container .MathJax, 
-  .markdown-container .MathJax_SVG {
-    font-size: 1em !important;
+  .markdown-container mjx-container * {
+    color: var(--text-color) !important;
   }
 }
 
-/* 平板设备优化 */
-@media (min-width: 769px) and (max-width: 1024px) {
-  .markdown-container .path-input-group { gap: 10px; }
-  .markdown-container #file-path-input { min-width: 200px; }
-}
-
-/* 打印样式优化 */
 @media print {
+  /* 移除阴影、外边距，让容器占据整个页面，为打印做准备 */
   .markdown-container {
     box-shadow: none;
     width: 100%;
     margin: 0;
   }
   
-  .markdown-container .controls { display: none; }
+  /* 隐藏所有交互和控制元素，只打印内容 */
+  .markdown-container .controls { 
+    display: none; 
+  }
   
-  .markdown-container .editor-container { flex-direction: column; }
+  /* 将编辑器容器改为垂直布局，以便正确显示预览内容 */
+  .markdown-container .editor-container { 
+    flex-direction: column; 
+  }
   
-  .markdown-container .editor-pane { display: none; }
+  /* 隐藏 Markdown 编辑器面板，只打印预览内容 */
+  .markdown-container .editor-pane { 
+    display: none; 
+  }
 }
