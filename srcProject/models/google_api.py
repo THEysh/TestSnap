@@ -16,15 +16,20 @@ from srcProject.models.flow_base_api import FlowOCR, image_to_base64
 
 
 class Google(FlowOCR):
-    def __init__(self, api_keys: list, api_name: str):
-        self.api_model_name = FLOW_USE_MODEL_NAME
-        self.client = genai.Client(api_key=api_keys[0])
-        super().__init__(api_keys, "", api_name)
+    def __init__(self, api_keys: list|str, model_name: str):
+        self.api_model_name = model_name
+        if isinstance(api_keys, str):
+            self.api_keys = [api_keys]
+        elif isinstance(api_keys, list):
+            self.api_keys = api_keys
+        self.client = genai.Client(api_key=self.api_keys[0])
+        super().__init__(api_keys, "", self.api_model_name)
 
     def _load_model(self):
         """
         加载模型（对于API客户端，这里主要是验证API密钥）
         """
+        print("def _load_model:", self.api_model_name,self.api_keys)
         for m in self.client.models.list():
             for action in m.supported_actions:
                 if action == "generateContent":

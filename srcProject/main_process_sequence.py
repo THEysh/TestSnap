@@ -15,6 +15,7 @@ import os
 
 
 model_manager = ModelManager()
+
 async def layout_prediction(input_path: str, bool_ocr = True, task_id = None) -> List[List[Dict[str, Any]]]:
     """
     处理单个文档，执行布局分析、文本提取和结构化，并进行可视化。

@@ -9,14 +9,17 @@ from srcProject.models.flow_base_api import FlowOCR, image_to_base64
 
 
 class Silicon(FlowOCR):
-    def __init__(self, api_keys: list|str, base_url: str, api_name: str):
-        self.api_model_name = FLOW_USE_MODEL_NAME
-        # 将 OpenAI 客户端改为 AsyncOpenAI
+    def __init__(self, api_keys: list|str, base_url: str, model_name: str):
+        self.api_model_name = model_name
+        if isinstance(api_keys, str):
+            self.api_keys = [api_keys]
+        elif isinstance(api_keys, list):
+            self.api_keys = api_keys
         self.client = AsyncOpenAI(
-            api_key=api_keys[0],
+            api_key=self.api_keys[0],
             base_url=base_url
         )
-        super().__init__(api_keys, base_url, api_name)
+        super().__init__(api_keys, base_url, self.api_model_name)
 
     def _load_model(self):
         """

@@ -5,7 +5,7 @@ import useFileSelector from '../hooks/useFileSelector';
 import StatusMessage from './StatusMessage';
 import ProgressBar from './ProgressBar';
 import { formatFileSize } from '../utils/fileUtils';
-
+import ModelConfig from './ModelConfig.jsx';
 const Controls = ({ onFileUpload, onFileProcess, onClearFile, file, status, progress, progressMessage, fileType }) => {
   const { dragActive, fileInputRef, handleDrag, handleFileChange, openFileDialog } = useFileSelector();
   
@@ -27,8 +27,7 @@ const Controls = ({ onFileUpload, onFileProcess, onClearFile, file, status, prog
   return (
     <div className="controls">
       <div className="upload-section">
-        <div 
-          className={`upload-area ${dragActive ? 'dragover' : ''}`}
+        <div className={`upload-area ${dragActive ? 'dragover' : ''}`}
           onDragEnter={handleDrag}
           onDragLeave={handleDrag}
           onDragOver={handleDrag}
@@ -46,6 +45,7 @@ const Controls = ({ onFileUpload, onFileProcess, onClearFile, file, status, prog
           <div className="upload-text">点击选择文件或拖拽到此处</div>
           <div className="upload-hint">支持PDF和常见图片格式，最大50MB</div>
         </div>
+        <ModelConfig />
         <input
           type="file"
           id="file-input"
@@ -54,8 +54,10 @@ const Controls = ({ onFileUpload, onFileProcess, onClearFile, file, status, prog
           onChange={(e) => handleFileChange(e, onFileUpload)}
           style={{ display: 'none' }}
         />
+        
       </div>
       
+
       {/* 其他UI部分 */}
       {file && (
         <div className="file-info">

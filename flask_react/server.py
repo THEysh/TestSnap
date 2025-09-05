@@ -11,8 +11,9 @@ from werkzeug.utils import secure_filename
 import uuid
 import nest_asyncio
 import asyncio
-from srcProject.main_process_sequence import main
+from srcProject.main_process_sequence import main, model_manager
 
+serve_model_manager = model_manager
 nest_asyncio.apply()
 app = Flask(__name__)
 
@@ -646,6 +647,47 @@ def process_uploaded_image():
             'success': False,
             'error': f'处理失败: {str(e)}'
         }), 500
+@app.route('/api/update/model_config', methods=['POST'])
+def update_model_config():
+    try:
+        data = request.get_json()
+        logger.info(f"接收到更新模型配置处理请求: {data}")
+        # 检查传入数据是否为字典
+        if not isinstance(data, dict):
+            return jsonify({"status": "error", "message": "请求体格式不正确，需要一个JSON对象"}), 400
+        # 获取并更新阅读模型
+        read_model = data.get('read_model')
+        if read_model:
+            serve_model_manager.change_read_model(model_name=read_model)
+
+        # 获取并更新OCR识别器模型
+        ocr_api_model = data.get('ocr_api_model')
+        if ocr_api_model:
+            api_name = ocr_api_model.get('api_name',None)
+            api_key = ocr_api_model.get('api_key',None)
+            base_url = ocr_api_model.get('base_url',None)
+            model_name = ocr_api_model.get('model_name',None)
+            # 确保关键字段存在
+            if not all([model_name]):
+                return jsonify({"status": "error",
+                                "message": "ocr_api_model配置缺失关键字段 (model_name)"}), 400
+
+            serve_model_manager.change_ocr_recognizer(
+                api_name=api_name,
+                api_key=api_key,
+                base_url=base_url,
+                model_name=model_name
+            )
+
+        # 如果两个模型都没有提供，返回错误
+        if not read_model and not ocr_api_model:
+            return jsonify({"status": "error", "message": "未提供任何模型配置进行更新"}), 400
+
+        return jsonify({"status": "success", "message": "模型配置更新成功"}), 200
+
+    except Exception as e:
+        logger.error(f"处理更新模型配置请求时发生错误: {e}", exc_info=True)
+        return jsonify({"status": "error", "message": f"处理请求时发生错误: {e}"}), 500
 
 @app.errorhandler(404)
 def not_found(error):
