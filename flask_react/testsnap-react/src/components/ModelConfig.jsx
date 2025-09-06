@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ENDPOINTS } from "../constants/apiConfig"; // 导入 API 端点
 import {
   BookOpen,
@@ -24,7 +24,6 @@ const ModelConfig = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
-
   // 处理 read_model 下拉菜单的变化
   const handleReadModelChange = (e) => {
     setReadModel(e.target.value);
@@ -42,15 +41,29 @@ const ModelConfig = () => {
     });
   };
 
+  const createMarkup = () => {
+    return { __html: statusMessage };
+  };
+
   // 处理文本输入框的变化
   const handleConfigChange = (e) => {
     const { name, value } = e.target;
-    setConfig({
-      ...config,
-      [name]: value
-    });
+    setConfig((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
-
+  // 监听变化，动态设置默认值
+  useEffect(() => {
+    if (ocrApiModel == "google") {
+      setConfig((prev) => ({
+         ...prev, baseUrl: "https://generativelanguage.googleapis.com" }));
+    } else if (ocrApiModel == "siliconflow") {
+      setConfig((prev) => ({
+         ...prev, baseUrl: "https://api.siliconflow.cn/v1" }));
+    }
+  }, [ocrApiModel]); 
+  
   // 封装API调用逻辑
   const handleUpdateConfig = async () => {
     setIsLoading(true);
@@ -83,8 +96,20 @@ const ModelConfig = () => {
 
       const data = await response.json();
 
+
       if (response.ok) {
-        setStatusMessage(data.message || "配置更新成功！");
+        // 构建详细的状态信息
+        let detailsMessage = "";
+        if (data.details) {
+          for (const [key, value] of Object.entries(data.details)) {
+            const modelInfo = value.model_name || "";
+            const apiInfo = value.api_name ? ` (${value.api_name})` : "";
+            const statusText = value.updated ? "✅ 更新成功" : "❌ 更新失败";
+            detailsMessage += `${key}: ${modelInfo}${apiInfo} -> ${statusText}<br/>`;
+          }
+        }
+  
+        setStatusMessage(`${data.message || "配置更新成功！"}<br/>${detailsMessage}`);
         setIsSuccess(true);
       } else {
         setStatusMessage(data.message || "配置更新失败，请重试。");
@@ -105,7 +130,7 @@ const ModelConfig = () => {
       <div className="controls">
         {/* 下拉框1：read_model */}
         <label className="form-row">
-          <BookOpen size={18} className="icon" />
+          <BookOpen className="icon" />
           <span>选择阅读模型：</span>
           <select value={readModel} onChange={handleReadModelChange}>
             <option value="Xy_Cut">Xy_Cut</option>
@@ -115,12 +140,12 @@ const ModelConfig = () => {
 
         {/* 下拉框2：ocr_api_model */}
         <label className="form-row">
-          <Cpu size={18} className="icon" />
+          <Cpu className="icon" />
           <span>选择 API 模型：</span>
           <select value={ocrApiModel} onChange={handleOcrApiModelChange}>
-            <option value="">--不使用--</option>
-            <option value="Siliconflow">Siliconflow</option>
-            <option value="google">Google</option>
+            <option value="">默认</option>
+            <option value="siliconflow">siliconflow</option>
+            <option value="google">google</option>
           </select>
         </label>
 
@@ -128,7 +153,7 @@ const ModelConfig = () => {
         {ocrApiModel && (
           <>
             <label className="form-row">
-              <Key size={18} className="icon" />
+              <Key className="icon" />
               <span>API Key：</span>
               <input
                 type="text"
@@ -140,7 +165,7 @@ const ModelConfig = () => {
             </label>
 
             <label className="form-row">
-              <Globe size={18} className="icon" />
+              <Globe className="icon" />
               <span>Base URL：</span>
               <input
                 type="text"
@@ -152,7 +177,7 @@ const ModelConfig = () => {
             </label>
 
             <label className="form-row">
-              <FileText size={18} className="icon" />
+              <FileText className="icon" />
               <span>Model Name：</span>
               <input
                 type="text"
@@ -178,16 +203,18 @@ const ModelConfig = () => {
       {/* 状态消息显示 */}
       {statusMessage && (
         <p
-          style={{
-            color: isSuccess ? "green" : "red",
-            marginTop: "10px",
-            textAlign: "center"
-          }}
-        >
-          {statusMessage}
-        </p>
-      )}
-    </div>
+        style={{
+          color: isSuccess ? "green" : "red",
+          marginTop: "10px",
+          textAlign: "center"
+        }}
+        // 将这里改为使用 dangerouslySetInnerHTML
+        dangerouslySetInnerHTML={createMarkup()}
+      >
+        {/* 注意：当使用 dangerouslySetInnerHTML 时，p 标签内部不能再有子元素 */}
+      </p>
+    )}
+  </div>
   );
 };
 

@@ -73,21 +73,23 @@ class ModelManager:
             device=self.device
         )
         print(f"已加载阅读顺序模型/算法: {model_name}")
+        return True
 
     def change_ocr_recognizer(self, model_name:str,
-                               api_name=None,
-                               api_key:list|str=None,
-                               base_url=None):
-        if model_name is None:
-            print("model_name is None; 更新失败")
-            return
-        if api_name is None:
+                               api_name:str =None,
+                               api_key:list|str =None,
+                               base_url:str =None):
+        if not model_name:  # 等价于 model_name is None or model_name == ""
+            print("model_name is None or empty; 更新失败")
+            return False
+        if not api_key:
+            print("api_key is None or empty; 更新失败")
+            return False
+        if not base_url:
+            print("base_url is None or empty; 更新失败")
+            return False
+        if not api_name:
             api_name = FLOW_API_NAME
-        if api_key is None:
-            api_key = FLOW_API_KEY
-        if base_url is None:
-            base_url = FLOW_URL
-        print("def change_ocr_recognizer :",api_key,base_url,api_name,model_name)
         self.ocr_recognizer = ModelFactory.create(
             api_key=api_key,
             base_url=base_url,
@@ -95,6 +97,7 @@ class ModelManager:
             model_name= model_name
         )
         print(f"已加载OCR-api模型: {api_name},当前激活: {model_name}")
+        return True
 if __name__ == '__main__':
     # 获取当前脚本所在的目录
     ModelManager(device='cpu').change_ocr_recognizer(model_name="models/gemma-3-27b-it",
