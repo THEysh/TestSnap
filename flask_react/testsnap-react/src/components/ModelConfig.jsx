@@ -40,7 +40,7 @@ const ModelConfig = () => {
       modelName: ""
     });
   };
-
+  // 状态消息的HTML内容
   const createMarkup = () => {
     return { __html: statusMessage };
   };
@@ -200,18 +200,18 @@ const ModelConfig = () => {
         {isLoading ? "更新中..." : "更新配置"}
       </button>
 
-      {/* 状态消息显示 */}
       {statusMessage && (
         <p
         style={{
           color: isSuccess ? "green" : "red",
           marginTop: "10px",
+          fontWeight: "bold",
           textAlign: "center"
         }}
         // 将这里改为使用 dangerouslySetInnerHTML
         dangerouslySetInnerHTML={createMarkup()}
       >
-        {/* 注意：当使用 dangerouslySetInnerHTML 时，p 标签内部不能再有子元素 */}
+        {/* 当使用 dangerouslySetInnerHTML 时，p 标签内部不能再有子元素 */}
       </p>
     )}
   </div>
