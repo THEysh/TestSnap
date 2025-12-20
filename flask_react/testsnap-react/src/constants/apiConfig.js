@@ -1,6 +1,6 @@
 // API配置文件
 // src\constants\apiConfig.js
-export const API_BASE_URL = 'http://192.168.1.128:7861/api';
+export const API_BASE_URL = 'http://127.0.0.1:7861/api';
 export const ENDPOINTS = {
   PDF_UPLOAD: `${API_BASE_URL}/pdf/upload`,
   PDF_PROCESS: `${API_BASE_URL}/pdf/process`,
