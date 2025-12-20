@@ -1,91 +1,148 @@
 
-# TextSnap: An Intelligent Document Parser and Structured Conversion Tool
+# **TextSnap**
+
+### Intelligent Document Parsing & Structured Conversion Tool
 
 ---
 
-**[English](README_EN.md)**     
-**[中文](README.md)**
+**📘 English**
+**📕 [中文](README.md)**
 
 ---
 
-## Project Overview
+## 📌 Overview
 
-TextSnap is a powerful intelligent document processing system that focuses on converting unstructured PDF and image documents into structured Markdown format. This project combines advanced computer vision and natural language processing technologies to achieve a complete workflow, from document input to structured output.
+**TextSnap** is an intelligent document processing system designed to automatically convert **unstructured PDF and image documents** into **well-structured Markdown files**.
 
-### In the directory 'srcProject \ output', you can see several examples of effects
+By integrating **Computer Vision (CV)** and **Natural Language Processing (NLP)** technologies, TextSnap provides an end-to-end pipeline covering document input, layout understanding, content recognition, and structured output generation.
 
 ---
+
+## 📷 Demo Results
+
+You can find several example outputs in the directory:
+
+```
+srcProject/output
+```
 
 <p align="center">
   <img src="srcProject/output/Realization of superhuman intelligence in microstrip filter/image.png" width="47%">
   <img src="srcProject/output/Realization of superhuman intelligence in microstrip filter/img.png" width="47%">
 </p>
 
+
+![](https://pic1.imgdb.cn/item/69465d7929a616e52860fc82.png)
+
+![](https://pic1.imgdb.cn/item/69465dcd29a616e52860ff57.png)
+
+![](https://pic1.imgdb.cn/item/69465de929a616e528610089.png)
+
+![](https://pic1.imgdb.cn/item/69465e2329a616e528610245.png)
+
+![](https://pic1.imgdb.cn/item/69465e5429a616e528610424.png)
+
 ---
 
-## Key Features
+## 🚀 Core Features
 
-  - **Multi-Format Document Parsing**: Supports importing and parsing of PDFs and various image formats (PNG, JPG, BMP, etc.).
-  - **Intelligent Layout Detection**: Uses a YOLO deep learning model to automatically identify document elements such as titles, text blocks, tables, images, and formulas.
-  - **High-Precision OCR**: Performs Optical Character Recognition on detected text regions to extract content.
-  - **Reading Order Prediction**: Analyzes the spatial relationships between document elements to determine a logical reading order.
-  - **Visual Representation**: Provides an intuitive graphical display of the detection results and reading order for easy verification and adjustment.
-  - **Markdown Generation**: Automatically generates a structured Markdown document based on the recognition results, preserving the original document's hierarchy.
+* **Multi-format Document Parsing**
+  Supports PDF and common image formats (PNG, JPG, BMP, etc.)
 
------
+* **Intelligent Layout Detection**
+  Uses YOLO-based deep learning models to automatically detect:
 
-## Technical Architecture
+  * Titles
+  * Paragraphs
+  * Tables
+  * Images
+  * Mathematical formulas
 
-  - **Backend Framework**: Python asynchronous programming (asyncio).
-  - **Image Processing**: PIL/Pillow.
-  - **Deep Learning Models**:
-      - YOLOv8 for document layout detection.
-      - A custom OCR model API for text recognition.
-      - LayoutLMv3 for reading order prediction.
-  - **Model Management**: A centralized `ModelManager` to uniformly handle various models.
-  - **Data Processing**: Implements a batch processing mechanism with concurrency control.
+* **High-Accuracy OCR Recognition**
+  Performs OCR on detected text regions to extract textual content
 
-### Installation
+* **Reading Order Prediction**
+  Analyzes spatial relationships between elements to generate a reading order aligned with human reading habits
 
-1.  Clone the repository
+* **Visualized Results**
+  Provides visual overlays of detected layouts and reading order for easy inspection and debugging
 
-    ```bash
-    git clone https://github.com/THEysh/TestSnap.git
-    cd TextSnap
-    ```
+* **Markdown Generation**
+  Automatically produces structured Markdown documents while preserving the original hierarchy of the source file
 
-2.  Create and activate a virtual environment
-    *python*:3.10.18
-    ```bash
-    python -m venv venv
-    # Windows
-    .\venv\Scripts\activate
-    # Linux/Mac
-    source venv/bin/activate
-    ```
+---
 
-3.  Install dependencies
+## 🧠 Technical Architecture
 
-    ```bash
-    pip install -r requirements.txt
-    ```
+* **Backend Language / Framework**: Python with `asyncio`
+* **Image Processing**: PIL / Pillow
+* **Deep Learning Models**
 
-### 4\. Download Pre-trained Models
+  * `YOLOv8` for document layout detection
+  * Custom OCR model API for text recognition
+  * `LayoutLMv3` for reading order prediction
+* **Model Management**: Unified management via `ModelManager`
+* **Data Processing**: Batch processing with concurrency control
 
-Run the following script to automatically download the necessary model files:
+---
+
+## ⚙️ Installation
+
+### 1️⃣ Clone the Repository
+
+```bash
+git clone https://github.com/THEysh/TestSnap.git
+cd TextSnap
+```
+
+---
+
+### 2️⃣ Create and Activate Virtual Environment
+
+> Required Python version: **3.10.18**
+
+```bash
+python -m venv venv
+
+# Windows
+.\venv\Scripts\activate
+
+# Linux / Mac
+source venv/bin/activate
+```
+
+---
+
+### 3️⃣ Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+### 4️⃣ Download Pretrained Models (Required)
+
+Run the following script to automatically download all required models:
 
 ```bash
 python scripts/download_models.py
 ```
 
-This script will automatically download the models and save them to the `data/models/` directory.
+Models will be downloaded to:
 
-If you encounter network issues when downloading directly from Hugging Face, we recommend manual download to ensure a smooth process.
+```
+data/models/
+```
 
-  * **International users**: Please visit [https://huggingface.co/THEYSH/testsnap](https://huggingface.co/THEYSH/testsnap)
-  * **Users in China**: Please visit [https://hf-mirror.com/THEYSH/testsnap](https://hf-mirror.com/THEYSH/testsnap)
+⚠️ If you encounter network issues when downloading from Hugging Face, **manual download is strongly recommended**:
 
-After downloading, please ensure that **all files in the `models` directory** are placed in the project root with the following structure:
+* **International users**
+  [https://huggingface.co/THEYSH/testsnap](https://huggingface.co/THEYSH/testsnap)
+* **Users in China**
+  [https://hf-mirror.com/THEYSH/testsnap](https://hf-mirror.com/THEYSH/testsnap)
+
+After downloading, ensure the directory structure is exactly as follows:
 
 ```
 ├── data/
@@ -97,62 +154,144 @@ After downloading, please ensure that **all files in the `models` directory** ar
 │           └── doclayout_yolo_docstructbench_imgsz1280_2501.pt
 ```
 
-5.  In the root directory, locate and modify `config.yaml` to configure VML. The current version supports the Siliconflow API, Google API
+---
 
-<!-- end list -->
+### 5️⃣ Configure LLM / VLM API (`config.yaml`)
 
-```markdown
+Locate **`config.yaml`** in the project root and configure your preferred model API.
+
+#### Example: SiliconFlow
+
+```yaml
 gpt-api:
   api_key: sk-cxr******
   api_name: Siliconflow
   base_url: https://api.siliconflow.cn/v1
   model_name: Pro/Qwen/Qwen2.5-VL-7B-Instruct
 ```
-google
-```markdown
+
+#### Example: Google Gemini
+
+```yaml
 gpt-api:
-  api_key: ["AIzaSyB***","AIza***","AIzaS***"]
+  api_key: ["AIzaSyB***", "AIza***", "AIzaS***"]
   api_name: google
   base_url: https://generativelanguage.googleapis.com
-  model_name: models/gemini-2.0-flash # models/gemma-3-27b-it models/gemini-2.0-flash
+  model_name: models/gemini-2.0-flash
 ```
------
 
-## Usage
+---
 
-### Command-line or Direct Run
+## ▶️ Usage
+
+### Run from Command Line (or Directly Run in IDE)
 
 ```bash
 python srcProject/main_process_sequence.py
 ```
-The results can be viewed in the `srcProject/output/visualizations` directory.
-Note that when using images or img predictions, try not to use spaces in file naming
------
 
-## Project Structure
+After execution, results can be found in:
+
+```
+srcProject/output/visualizations
+```
+
+⚠️ **Note**
+When using images for prediction, avoid spaces in file names to prevent path parsing issues.
+
+---
+
+## 📁 Project Structure
 
 ```
 TextSnap/
-├── .idea/                  # IDE configuration files
-├── configs.yaml            # Configuration file
-├── data/                   # Data directory
-│   └── models/             # Model files
-├── requirements.txt        # List of dependencies
-├── scripts/                # Utility scripts
-│   ├── download_models.py  # Model download script
-├── srcProject/             # Source code
-│   ├── config/             # Configuration module
-│   ├── data_loaders/       # Data loaders
-│   ├── main_process_sequence.py # Main processing pipeline
-│   ├── models/             # Model definitions
-│   ├── output/             # Output directory
-│   └── utlis/              # Utility functions
-└── tests/                  # Test code
-    └── test_data/          # Test data
+├── .idea/                      # IDE configuration
+├── configs.yaml                # Global configuration
+├── data/
+│   └── models/                 # Model files
+├── requirements.txt            # Python dependencies
+├── scripts/
+│   └── download_models.py      # Model download script
+├── srcProject/
+│   ├── config/                 # Configuration modules
+│   ├── data_loaders/           # Data loaders
+│   ├── main_process_sequence.py# Main processing pipeline
+│   ├── models/                 # Model definitions
+│   ├── output/                 # Output results
+│   └── utlis/                  # Utility functions
+└── tests/
+    └── test_data/              # Test datasets
 ```
 
------
+---
 
-## Contact
+## ⚛️ React Frontend (Optional)
 
-If you have any questions or suggestions, please contact me on WeChat: theysh\_
+### 1️⃣ Verify Node Environment (≥ 18)
+
+```bash
+node -v
+npm -v
+```
+
+If not installed, download the **LTS version** from:
+👉 [https://nodejs.org](https://nodejs.org)
+
+---
+
+### 2️⃣ Start React Frontend
+
+Open the following directory in VS Code:
+
+```
+flask_react/testsnap-react
+```
+
+Run:
+
+```bash
+cd flask_react/testsnap-react
+npm install
+npm run dev
+```
+
+Access the frontend at:
+
+```
+http://localhost:5173
+```
+
+✅ React environment is ready.
+You can configure API settings in:
+
+```
+flask_react/testsnap-react/src/constants/apiConfig.js
+```
+
+![](https://pic1.imgdb.cn/item/69465b8329a616e52860e904.png)
+
+---
+
+### 3️⃣ Start Backend Server
+
+* Open the project in **PyCharm**
+* Navigate to the `flask_react` directory
+* Right-click and run `server.py`
+
+The backend server runs on:
+
+```
+127.0.0.1
+```
+
+![](https://pic1.imgdb.cn/item/69465cc829a616e52860f4af.png)
+
+---
+
+## 📮 Contact
+
+If you have any questions or suggestions, feel free to contact me:
+
+**WeChat: theysh_**
+
+---
