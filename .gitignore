@@ -8,3 +8,5 @@ flask_react/testsnap-react/dist-ssr
 configs.yaml
 configs_github.yaml
 .env
+__pycache__/
+*.pyc
