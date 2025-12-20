@@ -198,3 +198,4 @@ if __name__ == '__main__':
     model_manager = ModelManager()
     asyncio.run(main('tests/test_data/demo1_页面_3.png'))
 
+
