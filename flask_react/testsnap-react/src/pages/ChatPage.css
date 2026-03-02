@@ -221,6 +221,15 @@
   font-weight: 600;
   margin-bottom: 6px;
 }
+.attachment-card .card-head .card-title{
+  flex: 1;
+}
+.attachment-card .card-head .card-actions{
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 .attachment-card .card-head .badge{
   margin-left: auto;
   padding: 2px 6px;
@@ -284,15 +293,60 @@
   gap: 8px;
 }
 .attachment-card .card-head .attach-remove{
-  margin-left: auto;
-  border: none;
+  border: 1px solid transparent;
   background: transparent;
   color: #2563eb;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11px;
+  padding: 0 6px;
+  height: 22px;
+  border-radius: 4px;
+  opacity: .8;
+}
+.attachment-card .card-head .attach-insert{
+  border: 1px solid transparent;
+  background: transparent;
+  color: #059669;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0 6px;
+  height: 22px;
+  border-radius: 4px;
+  opacity: .8;
+}
+.attachment-card .card-head .attach-insert:hover,
+.attachment-card .card-head .attach-remove:hover{
+  opacity: 1;
+  background: #f8fafc;
+  border-color: #e5e7eb;
 }
 .attachment-card .card-body.clickable{
   cursor: pointer;
+}
+
+.typing-indicator{
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 36px;
+  height: 16px;
+}
+.typing-indicator .dot{
+  width: 6px;
+  height: 6px;
+  background: #9ca3af;
+  border-radius: 50%;
+  animation: typingBlink 1.2s infinite ease-in-out;
+}
+.typing-indicator .dot:nth-child(2){
+  animation-delay: .2s;
+}
+.typing-indicator .dot:nth-child(3){
+  animation-delay: .4s;
+}
+@keyframes typingBlink{
+  0%, 80%, 100% { opacity: .2; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-2px); }
 }
 .composer textarea {
   flex: 1;

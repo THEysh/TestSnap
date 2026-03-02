@@ -514,6 +514,58 @@ def process_pdf_image(file_path, task_id=None):
         logger.error(f"{error_msg}\n{traceback.format_exc()}")
         return {'success': False, 'error': str(e)}
 
+@app.route('/api/chat/stream', methods=['POST'])
+def api_chat_stream():
+    """
+    SSE 流式接口：逐片输出 data: <text>\\n\\n
+    """
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        messages = data.get('messages') or []
+        if not isinstance(messages, list) or len(messages) == 0:
+            return jsonify({'success': False, 'error': 'messages 不能为空'}), 400
+
+        def sync_generator():
+            try:
+                loop = asyncio.new_event_loop()
+                try:
+                    asyncio.set_event_loop(loop)
+                except Exception:
+                    pass
+                agen = serve_model_manager.chat_model.achat_stream(messages)
+                try:
+                    while True:
+                        try:
+                            piece = loop.run_until_complete(agen.__anext__())
+                        except StopAsyncIteration:
+                            break
+                        if piece is None:
+                            continue
+                        txt = str(piece)
+                        yield f"data: {txt}\n\n"
+                finally:
+                    try:
+                        loop.run_until_complete(agen.aclose())
+                    except Exception:
+                        pass
+                    try:
+                        loop.stop()
+                        loop.close()
+                    except Exception:
+                        pass
+                yield "event: done\ndata: [DONE]\n\n"
+            except Exception as e:
+                err = str(e).replace("\n", " ")
+                yield f"event: error\ndata: {err}\n\n"
+
+        resp = Response(sync_generator(), mimetype='text/event-stream')
+        resp.headers['Cache-Control'] = 'no-cache'
+        resp.headers['Connection'] = 'keep-alive'
+        resp.headers['X-Accel-Buffering'] = 'no'
+        return resp
+    except Exception as e:
+        logger.error(f"/api/chat/stream 失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/pdf/upload', methods=['POST'])
 def upload_pdf():

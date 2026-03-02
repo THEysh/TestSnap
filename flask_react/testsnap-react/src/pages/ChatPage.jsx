@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { MessageSquare, Plus, Paperclip, Image as ImageIcon, FileText, Table } from 'lucide-react';
 import './ChatPage.css';
 import '../components/MarkdownViewer.css';
-import { getConversations, createConversation, consumeQueue, addMessage, setTargetConversation, deleteConversation } from '../utils/chatStorage';
+import { getConversations, createConversation, consumeQueue, addMessage, setTargetConversation, deleteConversation, updateLastAssistantMessage } from '../utils/chatStorage';
 import ChatMarkdown from './ChatMarkdown';
 
 function Sidebar({ convs, activeId, onSelect, onCreate, onDelete }) {
@@ -65,7 +65,127 @@ export default function ChatPage() {
   const [attachments, setAttachments] = useState([]);
   const [preview, setPreview] = useState({ open: false, data: null });
   const previewContentRef = useRef(null);
+  const [sending, setSending] = useState(false);
 
+  const callChatAPI = async (payload) => {
+    const endpoints = ['/api/chat'];
+    if (typeof window !== 'undefined') {
+      endpoints.push('http://localhost:7861/api/chat');
+    }
+    for (let i = 0; i < endpoints.length; i++) {
+      const url = endpoints[i];
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const ct = res.headers.get('content-type') || '';
+        const txt = await res.text();
+        if (!txt) throw new Error(`空响应 ${res.status}`);
+        if (ct.includes('application/json')) {
+          try {
+            return JSON.parse(txt);
+          } catch (e) {
+            throw new Error('JSON解析失败');
+          }
+        }
+        try {
+          return JSON.parse(txt);
+        } catch (e) {
+          return { success: false, error: txt.slice(0, 300) };
+        }
+      } catch (e) {
+        if (i === endpoints.length - 1) {
+          return { success: false, error: String(e) };
+        }
+        // 尝试下一个端点
+      }
+    }
+    return { success: false, error: '未知错误' };
+  };
+
+  const streamChatAPI = async (payload, onChunk) => {
+    const endpoints = ['/api/chat/stream'];
+    if (typeof window !== 'undefined') {
+      endpoints.push('http://localhost:7861/api/chat/stream');
+    }
+    for (let i = 0; i < endpoints.length; i++) {
+      const url = endpoints[i];
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+          },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        if (!res.body) throw new Error('无可读流');
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+        const readSep = () => {
+          const nn = buffer.indexOf('\n\n');
+          const rr = buffer.indexOf('\r\n\r\n');
+          if (nn === -1 && rr === -1) return { idx: -1, len: 0 };
+          if (nn === -1) return { idx: rr, len: 4 };
+          if (rr === -1) return { idx: nn, len: 2 };
+          return nn < rr ? { idx: nn, len: 2 } : { idx: rr, len: 4 };
+        };
+        const handleEvent = (evt) => {
+          const lines = evt.split(/\r?\n/);
+          const dataLines = lines
+            .filter(l => l.trimStart().startsWith('data:'))
+            .map(l => {
+              const p = l.indexOf('data:');
+              return l.slice(p + 5).replace(/^\s*/, '');
+            });
+          if (dataLines.length === 0) return false;
+          const payloadStr = dataLines.join('\n');
+          if (payloadStr === '[DONE]') return true;
+          let piece = '';
+          try {
+            const obj = JSON.parse(payloadStr);
+            if (obj && typeof obj === 'object') {
+              piece = obj.delta || obj.content || obj.text || obj.message || '';
+              if (!piece && Array.isArray(obj.choices) && obj.choices[0]?.delta?.content) {
+                piece = obj.choices[0].delta.content;
+              }
+            }
+          } catch (_) {
+            piece = '';
+          }
+          if (!piece) piece = payloadStr;
+          if (onChunk) onChunk(piece);
+          return false;
+        };
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          while (true) {
+            const { idx, len } = readSep();
+            if (idx === -1) break;
+            const event = buffer.slice(0, idx);
+            buffer = buffer.slice(idx + len);
+            const isDone = handleEvent(event);
+            if (isDone) return { success: true };
+          }
+        }
+        return { success: true };
+      } catch (e) {
+        if (i === endpoints.length - 1) {
+          return { success: false, error: String(e) };
+        }
+      }
+    }
+    return { success: false, error: '未知错误' };
+  };
   useEffect(() => {
     const existing = getConversations();
     setConvs(existing);
@@ -139,6 +259,7 @@ export default function ChatPage() {
   };
 
   const handleSend = () => {
+    if (sending) return;
     let convId = activeId;
     if (!convId) {
       const conv = createConversation({ title: '新对话' });
@@ -150,18 +271,61 @@ export default function ChatPage() {
     const hasInput = input.trim().length > 0;
     const hasAttach = attachments.length > 0;
     if (!hasInput && !hasAttach) return;
-    const content = hasInput ? input : '';
+    const content = input;
+    // 先记录用户消息
     addMessage(convId, { role: 'user', content, meta: { attachments } });
     setConvs(getConversations());
     setInput('');
-    setAttachments([]);
-    setTimeout(() => {
-      addMessage(convId, {
-        role: 'assistant',
-        content: '（AI 回复占位，后端准备好后接入）',
-      });
+    setSending(true);
+    // 构造 messages：历史对话 + 可选附件作为参考上下文（按指定格式）
+    const conv = (getConversations().find(c => c.id === convId) || { messages: [] });
+    const history = (conv.messages || [])
+      .filter(m => m.role === 'user' || m.role === 'assistant')
+      .map(m => ({ role: m.role, content: m.content || '' }));
+    if (hasAttach) {
+      const attachText = attachments
+        .map(a => a?.rawMd || a?.text || '')
+        .filter(Boolean)
+        .join('\n\n---\n\n');
+      if (attachText) {
+        for (let i = history.length - 1; i >= 0; i--) {
+          if (history[i].role === 'user') {
+            const base = history[i].content || '';
+            history[i] = {
+              role: 'user',
+              content: `${base}${base ? '\n\n' : ''}参考内容：\n\n${attachText}\n\n用户的提问可能与参考内容相关，请结合参考内容作答。`
+            };
+            break;
+          }
+        }
+      }
+    }
+    const messages = history;
+    // 先插入一个空的 assistant 消息作为占位，用于流式追加
+    addMessage(convId, { role: 'assistant', content: '' });
+    setConvs(getConversations());
+    // 流式优先
+    streamChatAPI({ messages }, (piece) => {
+      updateLastAssistantMessage(convId, piece);
       setConvs(getConversations());
-    }, 300);
+    }).then((ret) => {
+      if (!ret.success) {
+        // 回退非流式
+        return callChatAPI({ messages }).then(data => {
+          const reply = data && data.success ? (data.reply || '') : (data && data.error ? `调用失败：${data.error}` : '调用失败');
+          updateLastAssistantMessage(convId, reply);
+          setConvs(getConversations());
+          return null;
+        });
+      }
+      return null;
+    }).catch(err => {
+      updateLastAssistantMessage(convId, `\n\n[流式失败] ${String(err)}`);
+      setConvs(getConversations());
+    }).finally(() => {
+      setSending(false);
+      setAttachments([]);
+    });
   };
 
   return (
@@ -235,7 +399,11 @@ export default function ChatPage() {
                         ))}
                       </div>
                     )}
-                    {m.content && <ChatMarkdown content={m.content} />}
+                    {m.content
+                      ? <ChatMarkdown content={m.content} />
+                      : (m.role === 'assistant' && sending
+                        ? <div className="typing-indicator"><span className="dot" /><span className="dot" /><span className="dot" /></div>
+                        : null)}
                   </div>
                 </div>
               );
@@ -268,12 +436,24 @@ export default function ChatPage() {
                         <span className="card-title">
                           {a.type === 'image' ? '图片片段' : a.type === 'table' ? '表格片段' : '文本片段'}
                         </span>
-                        <button
-                          className="attach-remove"
-                          onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
-                        >
-                          移除
-                        </button>
+                        <div className="card-actions">
+                          <button
+                            className="attach-insert"
+                            onClick={() => {
+                              const insertText = a.rawMd || a.text || '';
+                              setInput(insertText || '');
+                            }}
+                            title="插入到输入框"
+                          >
+                            插入
+                          </button>
+                          <button
+                            className="attach-remove"
+                            onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
+                          >
+                            移除
+                          </button>
+                        </div>
                       </div>
                       <div
                         className="card-body clickable"
@@ -308,7 +488,7 @@ export default function ChatPage() {
               }
             }}
           />
-          <button onClick={handleSend} disabled={!input.trim() && attachments.length === 0}>
+          <button onClick={handleSend} disabled={sending || (!input.trim() && attachments.length === 0)}>
             发送
           </button>
         </div>

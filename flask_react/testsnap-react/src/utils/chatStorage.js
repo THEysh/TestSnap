@@ -57,30 +57,10 @@ export function addMessage(convId, message) {
   return convs[idx];
 }
 
-export function renameConversation(convId, newTitle) {
-  const convs = getConversations();
-  const idx = convs.findIndex(c => c.id === convId);
-  if (idx === -1) return null;
-  convs[idx].title = newTitle;
-  saveConversations(convs);
-  return convs[idx];
-}
-
 export function deleteConversation(convId) {
   const convs = getConversations().filter(c => c.id !== convId);
   saveConversations(convs);
   return convs;
-}
-
-export function buildUserMessagesFromBlocks(blocks) {
-  return blocks.map(b => ({
-    role: 'user',
-    content: b.text || b.html || '',
-    meta: {
-      type: b.type || 'text',
-      tag: b.tag || undefined,
-    }
-  }));
 }
 
 export function setTargetConversation(convId) {
@@ -91,8 +71,18 @@ export function setTargetConversation(convId) {
   }
 }
 
-export function getTargetConversation() {
-  const id = localStorage.getItem(TARGET_KEY);
-  return id || null;
+export function updateLastAssistantMessage(convId, appendText) {
+  const convs = getConversations();
+  const idx = convs.findIndex(c => c.id === convId);
+  if (idx === -1) return null;
+  const msgs = convs[idx].messages || [];
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    if (msgs[i].role === 'assistant') {
+      msgs[i].content = (msgs[i].content || '') + appendText;
+      break;
+    }
+  }
+  saveConversations(convs);
+  return convs[idx];
 }
 

@@ -34,3 +34,10 @@ FLOW_API_KEY = FLOW_CONFIG.get('api_key', '')
 FLOW_URL = FLOW_CONFIG.get('base_url', '')
 FLOW_API_NAME = FLOW_CONFIG.get('api_name', 'Siliconflow')
 FLOW_USE_MODEL_NAME = FLOW_CONFIG.get('model_name', 'Pro/Qwen/Qwen2.5-VL-7B-Instruct')
+
+# chat 专用配置（如未提供 chat-api，则回退至 gpt-api）
+CHAT_CONFIG = _config_data.get('chat-api', FLOW_CONFIG)
+CHAT_API_KEY = CHAT_CONFIG.get('api_key', FLOW_API_KEY)
+CHAT_URL = CHAT_CONFIG.get('base_url', FLOW_URL)
+CHAT_API_NAME = CHAT_CONFIG.get('api_name', FLOW_API_NAME)
+CHAT_MODEL_NAME = CHAT_CONFIG.get('model_name', 'Qwen/Qwen3-VL-8B-Instruct')
