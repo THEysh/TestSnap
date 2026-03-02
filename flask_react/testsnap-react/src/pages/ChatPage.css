@@ -166,33 +166,46 @@
 }
 .messages {
   flex: 1;
-  padding: 16px;
+  padding: 20px;
   overflow-y: auto;
   background: #f8fafc;
 }
 .messages .msg {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 .messages .msg .role {
-  width: 40px;
-  text-align: right;
-  color: #6b7280;
+  min-width: 44px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  text-align: center;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
   flex-shrink: 0;
+  font-size: 12px;
+  line-height: 24px;
 }
 .messages .msg .content {
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 10px 12px;
-  max-width: 70%;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, .04);
+  border-radius: 12px;
+  padding: 14px 16px;
+  max-width: 75%;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
 }
 .messages .msg .content .chat-md{
   font-size: 14px;
-  line-height: 1.7;
+  line-height: 1.8;
+}
+.messages .msg .content .chat-md > :first-child{
+  margin-top: 0;
+}
+.messages .msg .content .chat-md > :last-child{
+  margin-bottom: 0;
 }
 .msg-attachments{
   display: grid;

@@ -114,8 +114,7 @@ class SiliconChatModel(BaseModel):
 
     async def achat_stream(self, messages: List[Dict[str, Any]]):
         """
-        异步流式聊天：yield 文本增量
-        包含模型思考内容（reasoning_content）与普通内容（content），如实输出。
+        异步流式聊天：只返回content内容，不包含reasoning_content
         """
         norm_messages = self._normalize_messages(messages)
         resp = await self.client.chat.completions.create(
@@ -129,60 +128,48 @@ class SiliconChatModel(BaseModel):
             delta = chunk.choices[0].delta
             if not delta:
                 continue
-            # 优先输出思考内容（若模型支持），随后输出普通内容
-            rc = getattr(delta, "reasoning_content", None)
-            if rc:
-                try:
-                    yield str(rc)
-                except Exception:
-                    yield rc  # 最后兜底
+            # 只返回content内容，忽略reasoning_content
             ct = getattr(delta, "content", None)
             if ct:
                 try:
+                    print(ct,end='')
                     yield str(ct)
                 except Exception:
                     yield ct
 
-def main():
-    url = "http://localhost:7861/api/chat/stream"
-    payload = {
-        "messages": [
-            {"role": "system", "content": "你是一个简洁的中文助理。"},
-            {"role": "user", "content": "从1数到10"}
-        ]
-    }
-    print("POST", url)
-    with requests.post(url, json=payload, stream=True) as r:
-        r.raise_for_status()
-        print("开始流式接收：")
-        buffer = ""
-        for chunk in r.iter_content(chunk_size=1024):
-            if not chunk:
-                continue
-            buffer += chunk.decode("utf-8")
-            # SSE 以空行分帧
-            while True:
-                idx = buffer.find("\n\n")
-                if idx == -1:
-                    break
-                frame = buffer[:idx]
-                buffer = buffer[idx + 2:]
-                # 解析 data 行
-                for line in frame.split("\n"):
-                    if line.startswith("data: "):
-                        data = line[len("data: "):]
-                        if data == "[DONE]":
-                            print("\n[完成]")
-                            return
-                        # 直接输出片段
-                        sys.stdout.write(data)
-                        sys.stdout.flush()
-                    elif line.startswith("event: error"):
-                        print("\n[服务端错误帧]")
-                # 下一帧
-        print("\n[连接结束]")
+# 这个是后端的接口示例：
+#
+# {
+#
+# "messages": [
+#
+# {
+#
+# "role": "string",        // 角色：system, user, assistant
+#
+# "content": "string",      // 文本内容（可选，当有图片字段时可省略）
+#
+# // 图片相关字段（三选一或组合使用）
+#
+# "image_url": "string",    // 单张图片URL
+#
+# "image_base64": "string", // 单张图片Base64编码
+#
+# "images": [               // 多张图片URL列表
+#
+# "string"
+#
+# ],
+#
+# // 其他可选字段
+#
+# "text": "string",         // 替代content的文本字段
+#
+# "name": "string"          // 角色名称（可选）
+#
+# }
+#
+# ]
+#
+# }
 
-
-if __name__ == "__main__":
-    # 先启动server.py 在运行测试流式访问
-    main()

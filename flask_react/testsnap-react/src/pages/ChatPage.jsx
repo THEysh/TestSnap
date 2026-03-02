@@ -144,7 +144,8 @@ export default function ChatPage() {
             .filter(l => l.trimStart().startsWith('data:'))
             .map(l => {
               const p = l.indexOf('data:');
-              return l.slice(p + 5).replace(/^\s*/, '');
+              const rest = l.slice(p + 5);
+              return rest.startsWith(' ') ? rest.slice(1) : rest;
             });
           if (dataLines.length === 0) return false;
           const payloadStr = dataLines.join('\n');
@@ -277,6 +278,7 @@ export default function ChatPage() {
     addMessage(convId, { role: 'user', content, meta: { attachments } });
     setConvs(getConversations());
     setInput('');
+    setAttachments([]);
     setSending(true);
     // 构造 messages：历史对话 + 当前用户输入 + 附件（文本拼接到用户输入末尾；图片按接口字段加入）
     const conv = (getConversations().find(c => c.id === convId) || { messages: [] });

@@ -542,7 +542,14 @@ def api_chat_stream():
                         if piece is None:
                             continue
                         txt = str(piece)
-                        yield f"data: {txt}\n\n"
+                        if txt:
+                            txt = txt.replace("\r\n", "\n").replace("\r", "\n")
+                            lines = txt.split("\n")
+                            for line in lines:
+                                yield f"data: {line}\n"
+                        else:
+                            yield "data:\n"
+                        yield "\n"
                 finally:
                     try:
                         loop.run_until_complete(agen.aclose())
