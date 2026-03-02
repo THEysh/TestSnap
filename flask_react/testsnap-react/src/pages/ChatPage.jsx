@@ -4,6 +4,7 @@ import './ChatPage.css';
 import '../components/MarkdownViewer.css';
 import { getConversations, createConversation, consumeQueue, addMessage, setTargetConversation, deleteConversation, updateLastAssistantMessage } from '../utils/chatStorage';
 import ChatMarkdown from './ChatMarkdown';
+import { buildMessages } from '../utils/buildChatMessages';
 
 function Sidebar({ convs, activeId, onSelect, onCreate, onDelete }) {
   return (
@@ -277,30 +278,10 @@ export default function ChatPage() {
     setConvs(getConversations());
     setInput('');
     setSending(true);
-    // 构造 messages：历史对话 + 可选附件作为参考上下文（按指定格式）
+    // 构造 messages：历史对话 + 当前用户输入 + 附件（文本拼接到用户输入末尾；图片按接口字段加入）
     const conv = (getConversations().find(c => c.id === convId) || { messages: [] });
-    const history = (conv.messages || [])
-      .filter(m => m.role === 'user' || m.role === 'assistant')
-      .map(m => ({ role: m.role, content: m.content || '' }));
-    if (hasAttach) {
-      const attachText = attachments
-        .map(a => a?.rawMd || a?.text || '')
-        .filter(Boolean)
-        .join('\n\n---\n\n');
-      if (attachText) {
-        for (let i = history.length - 1; i >= 0; i--) {
-          if (history[i].role === 'user') {
-            const base = history[i].content || '';
-            history[i] = {
-              role: 'user',
-              content: `${base}${base ? '\n\n' : ''}参考内容：\n\n${attachText}\n\n用户的提问可能与参考内容相关，请结合参考内容作答。`
-            };
-            break;
-          }
-        }
-      }
-    }
-    const messages = history;
+    const history = (conv.messages || []).filter(m => m.role === 'user' || m.role === 'assistant');
+    const messages = buildMessages(history, content, attachments);
     // 先插入一个空的 assistant 消息作为占位，用于流式追加
     addMessage(convId, { role: 'assistant', content: '' });
     setConvs(getConversations());
