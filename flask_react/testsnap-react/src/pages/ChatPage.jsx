@@ -1,9 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { MessageSquare, Plus, Paperclip, Image as ImageIcon, FileText, Table } from 'lucide-react';
 import './ChatPage.css';
-import { getConversations, createConversation, consumeQueue, addMessage, setTargetConversation } from '../utils/chatStorage';
+import '../components/MarkdownViewer.css';
+import { getConversations, createConversation, consumeQueue, addMessage, setTargetConversation, deleteConversation } from '../utils/chatStorage';
+import ChatMarkdown from './ChatMarkdown';
 
-function Sidebar({ convs, activeId, onSelect, onCreate }) {
+function Sidebar({ convs, activeId, onSelect, onCreate, onDelete }) {
   return (
     <div className="chat-sider">
       <div className="sider-header">
@@ -29,6 +31,16 @@ function Sidebar({ convs, activeId, onSelect, onCreate }) {
             >
               <div className="sider-item-title">{c.title || '未命名对话'}</div>
               <div className="sider-item-meta">{new Date(c.createdAt).toLocaleString()}</div>
+              <button
+                className="sider-delete"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(c.id);
+                }}
+                title="删除该对话"
+              >
+                删除
+              </button>
             </div>
           ))
         )}
@@ -52,6 +64,7 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState([]);
   const [preview, setPreview] = useState({ open: false, data: null });
+  const previewContentRef = useRef(null);
 
   useEffect(() => {
     const existing = getConversations();
@@ -83,16 +96,34 @@ export default function ChatPage() {
     }
   }, [activeId]);
 
+  // 预览弹窗内的表格/图片采用 HTML 注入，需在打开时触发 MathJax 渲染
+  useEffect(() => {
+    if (preview.open && previewContentRef.current && typeof window !== 'undefined' && window.MathJax) {
+      try {
+        window.MathJax.typesetPromise([previewContentRef.current]);
+      } catch (e) {
+        // ignore
+      }
+    }
+  }, [preview]);
+
   // 监听其它页面追加的队列项，追加到当前聊天窗口的附件中
   useEffect(() => {
     const onStorage = (e) => {
       if (e.key === 'textsnap_chat_queue') {
         const items = consumeQueue();
         if (!items || items.length === 0) return;
-        const forMe = items.filter((it) => !it.convId || it.convId === activeId);
-        if (forMe.length > 0) {
-          setAttachments((prev) => prev.concat(forMe));
+        if (!activeId) {
+          const conv = createConversation({ title: '新对话' });
+          setConvs(getConversations());
+          setActiveId(conv.id);
+          setTargetConversation(conv.id);
+          setAttachments((prev) => prev.concat(items));
+          return;
         }
+        const forMe = items.filter((it) => !it.convId || it.convId === activeId);
+        const accept = forMe.length > 0 ? forMe : items;
+        setAttachments((prev) => prev.concat(accept));
       }
     };
     window.addEventListener('storage', onStorage);
@@ -108,17 +139,24 @@ export default function ChatPage() {
   };
 
   const handleSend = () => {
-    if (!activeId) return;
+    let convId = activeId;
+    if (!convId) {
+      const conv = createConversation({ title: '新对话' });
+      setConvs(getConversations());
+      setActiveId(conv.id);
+      setTargetConversation(conv.id);
+      convId = conv.id;
+    }
     const hasInput = input.trim().length > 0;
     const hasAttach = attachments.length > 0;
     if (!hasInput && !hasAttach) return;
     const content = hasInput ? input : '';
-    addMessage(activeId, { role: 'user', content, meta: { attachments } });
+    addMessage(convId, { role: 'user', content, meta: { attachments } });
     setConvs(getConversations());
     setInput('');
     setAttachments([]);
     setTimeout(() => {
-      addMessage(activeId, {
+      addMessage(convId, {
         role: 'assistant',
         content: '（AI 回复占位，后端准备好后接入）',
       });
@@ -128,7 +166,27 @@ export default function ChatPage() {
 
   return (
     <div className="chat-page">
-      <Sidebar convs={convs} activeId={activeId} onSelect={setActiveId} onCreate={handleCreate} />
+      <Sidebar
+        convs={convs}
+        activeId={activeId}
+        onSelect={setActiveId}
+        onCreate={handleCreate}
+        onDelete={(id) => {
+          const remained = deleteConversation(id);
+          setConvs(remained);
+          if (id === activeId) {
+            if (remained.length > 0) {
+              setActiveId(remained[0].id);
+              setTargetConversation(remained[0].id);
+            } else {
+              const conv = createConversation({ title: '新对话' });
+              setConvs(getConversations());
+              setActiveId(conv.id);
+              setTargetConversation(conv.id);
+            }
+          }
+        }}
+      />
       <div className="chat-main">
         <div className="messages">
           {activeConv ? (
@@ -162,17 +220,22 @@ export default function ChatPage() {
                               </span>
                             </div>
                             <div className="card-body">
-                              {a.type === 'text'
-                                ? (a.text || '').slice(0, 60)
-                                : a.type === 'table'
-                                ? '点击查看表格'
-                                : '点击查看图片'}
+                              {a.type === 'image' ? (
+                                <div
+                                  className="card-thumb"
+                                  dangerouslySetInnerHTML={{ __html: a.html || '' }}
+                                />
+                              ) : a.type === 'table' ? (
+                                '点击查看表格'
+                              ) : (
+                                (a.text || '').slice(0, 60)
+                              )}
                             </div>
                           </div>
                         ))}
                       </div>
                     )}
-                    {m.content && <div className="msg-text">{m.content}</div>}
+                    {m.content && <ChatMarkdown content={m.content} />}
                   </div>
                 </div>
               );
@@ -217,11 +280,16 @@ export default function ChatPage() {
                         onClick={() => setPreview({ open: true, data: a })}
                         title="点击查看内容"
                       >
-                        {a.type === 'text'
-                          ? (a.text || '').slice(0, 80)
-                          : a.type === 'table'
-                          ? '点击查看表格'
-                          : '点击查看图片'}
+                        {a.type === 'image' ? (
+                          <div
+                            className="card-thumb"
+                            dangerouslySetInnerHTML={{ __html: a.html || '' }}
+                          />
+                        ) : a.type === 'table' ? (
+                          '点击查看表格'
+                        ) : (
+                          (a.text || '').slice(0, 80)
+                        )}
                       </div>
                     </div>
                   );
@@ -240,7 +308,7 @@ export default function ChatPage() {
               }
             }}
           />
-          <button onClick={handleSend} disabled={!activeId || (!input.trim() && attachments.length === 0)}>
+          <button onClick={handleSend} disabled={!input.trim() && attachments.length === 0}>
             发送
           </button>
         </div>
@@ -259,12 +327,16 @@ export default function ChatPage() {
                   关闭
                 </button>
               </div>
-              <div className="preview-content">
-                {preview.data?.type === 'text' && <div className="preview-text">{preview.data?.text || ''}</div>}
-                {preview.data?.type === 'table' && (
+              <div className="preview-content markdown-container" ref={previewContentRef}>
+                {preview.data?.rawMd
+                  ? <ChatMarkdown content={preview.data?.rawMd} />
+                  : preview.data?.type === 'text'
+                    ? <ChatMarkdown content={preview.data?.text || ''} />
+                    : null}
+                {!preview.data?.rawMd && preview.data?.type === 'table' && (
                   <div className="preview-html" dangerouslySetInnerHTML={{ __html: preview.data?.html || '' }} />
                 )}
-                {preview.data?.type === 'image' && (
+                {!preview.data?.rawMd && preview.data?.type === 'image' && (
                   <div className="preview-html" dangerouslySetInnerHTML={{ __html: preview.data?.html || '' }} />
                 )}
               </div>

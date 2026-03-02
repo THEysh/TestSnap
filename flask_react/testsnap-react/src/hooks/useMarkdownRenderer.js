@@ -21,47 +21,24 @@ const useMarkdownRenderer = () => {
     }
   }, []);
 
-  // 渲染Markdown内容
+  // 渲染Markdown内容（按块渲染并为每块绑定原始Markdown，便于后续携带rawMd）
   const renderMarkdown = (input) => {
     if (!previewRef.current || !window.marked) {
       return;
     }
-
-    // 保护数学公式不被解析器处理
-    let tempStorage = [];
-    let tempIndex = 0;
-
-    // 保护块级公式
-    let protectedInput = input.replace(/\$\$[\s\S]*?\$\$/g, function(match) {
-      const placeholder = `MATH_BLOCK_${tempIndex}`;
-      tempStorage[tempIndex] = match;
-      tempIndex++;
-      return placeholder;
-    });
-
-    // 保护行内公式
-    protectedInput = protectedInput.replace(/\$(?!\$)([^\$\n]+?)\$/g, function(match) {
-      const placeholder = `MATH_INLINE_${tempIndex}`;
-      tempStorage[tempIndex] = match;
-      tempIndex++;
-      return placeholder;
-    });
-
-    // 使用marked解析Markdown
-    let html = window.marked.parse(protectedInput);
-
-    // 恢复数学公式
-    html = html.replace(/MATH_BLOCK_(\d+)/g, function(match, index) {
-      return tempStorage[parseInt(index)];
-    });
-
-    html = html.replace(/MATH_INLINE_(\d+)/g, function(match, index) {
-      return tempStorage[parseInt(index)];
-    });
-
-    // 更新预览
-    previewRef.current.innerHTML = html;
-
+    const blocks = splitMdBlocks(input || '');
+    const parts = [];
+    for (let i = 0; i < blocks.length; i++) {
+      const raw = blocks[i];
+      let frag = '';
+      try {
+        frag = window.marked.parse(raw);
+      } catch (e) {
+        frag = window.marked.parse(raw || '');
+      }
+      parts.push(`<div class="md-block" data-raw-md="${encodeURIComponent(raw)}">${frag}</div>`);
+    }
+    previewRef.current.innerHTML = parts.join('\n');
     // 触发MathJax重新渲染
     if (window.MathJax) {
       MathJax.typesetPromise([previewRef.current]).catch(function(err) {
@@ -83,40 +60,69 @@ const useMarkdownRenderer = () => {
 
 function enhanceBlocks(root) {
   if (!root) return;
-  const selector = [
-    'h1','h2','h3','h4','h5','h6',
-    'p','table','pre','blockquote','img'
-  ].join(',');
-  const nodes = root.querySelectorAll(selector);
+  const nodes = root.querySelectorAll('.md-block');
   nodes.forEach((node) => {
     if (node.dataset && node.dataset.chatEnhanced === '1') return;
-    const wrapper = document.createElement('div');
-    wrapper.className = 'chat-enhanced-wrap';
-    wrapper.title = '加入聊天框';
-    node.parentNode.insertBefore(wrapper, node);
-    wrapper.appendChild(node);
-    wrapper.addEventListener('click', (e) => {
-      // 避免在选中文本时误触
+    node.classList.add('chat-enhanced-wrap');
+    node.title = '加入聊天框';
+    node.addEventListener('click', (e) => {
       const selection = window.getSelection ? window.getSelection().toString() : '';
       if (selection && selection.length > 0) return;
-      const tag = node.tagName.toLowerCase();
-      const type = tag === 'img' ? 'image' : tag === 'table' ? 'table' : 'text';
+      const hasImg = !!node.querySelector('img');
+      const hasTable = !!node.querySelector('table');
+      const type = hasImg ? 'image' : hasTable ? 'table' : 'text';
+      const tag = hasImg ? 'img' : hasTable ? 'table' : 'p';
+      let rawMd = '';
+      try { rawMd = decodeURIComponent(node.getAttribute('data-raw-md') || ''); } catch (e) {}
       const payload = {
         tag,
         type,
-        text: type === 'text' ? (node.innerText || '').trim().slice(0, 2000) : undefined,
-        html: type !== 'text' ? node.outerHTML : undefined,
+        rawMd,
+        text: (node.textContent || '').trim().slice(0, 2000),
+        html: node.innerHTML
       };
       enqueueBlock(payload);
       const url = (typeof window !== 'undefined')
         ? (window.location.origin + window.location.pathname + '#/chat?new=1')
         : '#/chat?new=1';
-      // 使用具名窗口，复用已开启的聊天页
       window.open(url, 'TextSnapChat');
       e.stopPropagation();
     });
     node.dataset.chatEnhanced = '1';
   });
+}
+
+function splitMdBlocks(src) {
+  const lines = src.split(/\r?\n/);
+  const blocks = [];
+  let buf = [];
+  let inFence = false;
+  let fenceMarker = '';
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const fenceMatch = line.match(/^(```+|~~~+)/);
+    if (fenceMatch) {
+      if (!inFence) {
+        inFence = true;
+        fenceMarker = fenceMatch[1][0];
+      } else {
+        inFence = false;
+        fenceMarker = '';
+      }
+      buf.push(line);
+      continue;
+    }
+    if (!inFence && line.trim() === '') {
+      if (buf.length) {
+        blocks.push(buf.join('\n'));
+        buf = [];
+      }
+      continue;
+    }
+    buf.push(line);
+  }
+  if (buf.length) blocks.push(buf.join('\n'));
+  return blocks;
 }
 
 export default useMarkdownRenderer;

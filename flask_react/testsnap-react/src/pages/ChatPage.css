@@ -10,6 +10,7 @@
   background: #fff;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 .chat-sider .sider-header{
   height: 56px;
@@ -41,16 +42,18 @@
 .chat-sider .sider-body {
   padding: 10px;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 .chat-sider .sider-item{
   position: relative;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
-  padding: 10px 36px 10px 12px;
+  padding: 10px 60px 10px 12px;
   background: #fff;
   margin-bottom: 10px;
   cursor: pointer;
   transition: border-color .15s ease, box-shadow .15s ease, transform .06s ease;
+  overflow: hidden;
 }
 .chat-sider .sider-item:hover{
   border-color: #c7d2fe;
@@ -99,6 +102,24 @@
   color: #ef4444;
   border-color: #fecaca;
   background: #fff5f5;
+}
+.chat-sider .sider-delete{
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%) translateX(100%);
+  opacity: 0;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #fecaca;
+  background: #fff5f5;
+  color: #ef4444;
+  cursor: pointer;
+  transition: transform .2s ease, opacity .2s ease;
+}
+.chat-sider .sider-item:hover .sider-delete{
+  transform: translateY(-50%) translateX(0);
+  opacity: 1;
 }
 .chat-sider .sider-footer{
   margin-top: auto;
@@ -169,6 +190,10 @@
   max-width: 70%;
   box-shadow: 0 1px 3px rgba(15, 23, 42, .04);
 }
+.messages .msg .content .chat-md{
+  font-size: 14px;
+  line-height: 1.7;
+}
 .msg-attachments{
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -182,6 +207,7 @@
   padding: 8px;
   cursor: pointer;
   transition: border-color .15s ease, box-shadow .15s ease;
+  overflow: hidden;
 }
 .attachment-card:hover{
   border-color: #c7d2fe;
@@ -195,12 +221,34 @@
   font-weight: 600;
   margin-bottom: 6px;
 }
+.attachment-card .card-head .badge{
+  margin-left: auto;
+  padding: 2px 6px;
+  font-size: 11px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #eef2ff;
+  color: #3730a3;
+}
 .attachment-card .card-title{
   font-size: 13px;
 }
 .attachment-card .card-body{
   font-size: 12px;
   color: #475569;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
+  max-height: 72px;
+}
+.attachment-card .card-thumb img{
+  max-width: 100%;
+  max-height: 120px;
+  object-fit: contain;
+  display: block;
 }
 .messages .msg.user .content {
   border-color: #bfdbfe;
