@@ -348,6 +348,25 @@
   transition: opacity 0.3s ease;
 }
 
+.markdown-container .chat-enhanced-wrap { position: relative; }
+.markdown-container .chat-enhanced-wrap:hover { outline: 1px dashed rgba(102, 126, 234, 0.35); outline-offset: 2px; }
+.markdown-container .chat-enhanced-wrap::after {
+  content: "加入聊天框";
+  position: absolute;
+  top: -10px;
+  right: 8px;
+  font-size: 12px;
+  color: #fff;
+  background: rgba(102, 126, 234, 0.95);
+  padding: 2px 8px;
+  border-radius: 10px;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity .2s ease, transform .2s ease;
+  pointer-events: none;
+}
+.markdown-container .chat-enhanced-wrap:hover::after { opacity: 1; transform: translateY(0); }
+
 .markdown-container mjx-container {
   margin: 10px 0 !important;
   animation: fadeIn 0.5s ease-out;

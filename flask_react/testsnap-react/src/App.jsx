@@ -4,13 +4,24 @@ import PDFViewer from './components/PDFViewer';
 import ImageViewer from './components/ImageViewer';
 import MarkdownViewer from './components/MarkdownViewer';
 import './App.css';
-import React, { useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import useFileUpload from './hooks/useFileUpload';
 import useFileProcess from './hooks/useFileProcess';
+
+const ChatPage = React.lazy(() => import('./pages/ChatPage'));
 
 function App() {
   const [file, setFile] = useState(null);
   const [fileType, setFileType] = useState('');
+  const [route, setRoute] = useState(
+    typeof window !== 'undefined' ? (window.location.hash || '#/') : '#/'
+  );
+  useEffect(() => {
+    const handler = () => setRoute(window.location.hash || '#/');
+    window.addEventListener('hashchange', handler);
+    return () => window.removeEventListener('hashchange', handler);
+  }, []);
+  const isChat = useMemo(() => route.startsWith('#/chat'), [route]);
   
   // 使用自定义Hooks
   const { 
@@ -66,7 +77,11 @@ function App() {
     return uploadStatus;
   };
 
-  return (
+  return isChat ? (
+    <Suspense fallback={<div style={{ padding: 20 }}>加载聊天页面...</div>}>
+      <ChatPage />
+    </Suspense>
+  ) : (
     <div className="container">
       <Header />
       <Controls
