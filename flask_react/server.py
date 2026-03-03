@@ -803,6 +803,7 @@ if __name__ == '__main__':
     # PDF API信息
     print(f"PDF上传: http://localhost:{PORT}/api/pdf/upload")
     print(f"PDF处理: http://localhost:{PORT}/api/pdf/process")
-
+    # 对话聊天
+    print(f"对话聊天： http://localhost:{PORT}/api/chat/stream")
 
     app.run(host='0.0.0.0', port=PORT, debug=True)
