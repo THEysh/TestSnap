@@ -124,14 +124,14 @@ class SiliconChatModel(BaseModel):
 
     async def achat_stream(self, messages: List[Dict[str, Any]],
                            enable_reasoning : bool = False,
-                           model : str = None) -> AsyncGenerator[
+                           model_name : str = None) -> AsyncGenerator[
         Union[str, Dict[str, str]], None]:
         """
         异步流式聊天
 
         Args:
             messages: 消息列表
-            model : 网络模型
+            model_name : 网络模型
             enable_reasoning: 是否开启思考流程
                 - True: 如果模型支持，返回包含 reasoning_content 和 content
                 - False: 只返回 content 内容（默认行为，与原来一致）
@@ -141,8 +141,8 @@ class SiliconChatModel(BaseModel):
         """
         norm_messages = self._normalize_messages(messages)
         # 构建基础请求参数
-        if model is not None:
-            self._model_name = model
+        if model_name is not None:
+            self._model_name = model_name
         request_params = {
             "model": self._model_name,
             "messages": norm_messages,
@@ -151,7 +151,7 @@ class SiliconChatModel(BaseModel):
         if enable_reasoning and self._model_name in can_think_models:
             request_params["extra_body"] = {
                         "enable_thinking": enable_reasoning,
-                        "thinking_budget": 2048  # 控制思考过程最大长度为1000 token
+                        "thinking_budget": 4096  # 控制思考过程最大长度为1000 token
                     }
         else: enable_reasoning = False
         try:
@@ -160,24 +160,12 @@ class SiliconChatModel(BaseModel):
                 if not chunk.choices:
                     continue
                 delta = chunk.choices[0].delta
-                if not delta:
-                    continue
-                if enable_reasoning:
-                    # 开启思考模式：返回结构化数据
-                    # 检查思考内容
-                    reasoning = getattr(delta, "reasoning_content", None)
-                    if reasoning:
-                        yield {"type": "reasoning", "content": str(reasoning)}
-
-                    # 检查最终内容
-                    ct = getattr(delta, "content", None)
-                    if ct:
-                        yield {"type": "content", "content": str(ct)}
-                else:
-                    # 兼容原有模式：只返回content内容
-                    ct = getattr(delta, "content", None)
-                    if ct:
-                        yield {"type": "content", "content": str(ct)}
+                if not delta: continue
+                reasoning = getattr(delta, "reasoning_content", None)
+                if reasoning: yield {"type": "reasoning", "content": str(reasoning)}
+                # 检查最终内容
+                ct = getattr(delta, "content", None)
+                if ct: yield {"type": "content", "content": str(ct)}
         except Exception as e:
             error_msg = f"API调用错误: {str(e)}"
             print(error_msg)
@@ -211,16 +199,8 @@ class SiliconChatModel(BaseModel):
 # "string"
 #
 # ],
-#
-# // 其他可选字段
-#
-# "text": "string",         // 替代content的文本字段
-#
-# "name": "string"          // 角色名称（可选）
-#
-# }
-#
-# ]
+# "enable_reasoning" : true,
+# "model_name": "zai-org/GLM-4.5V"
 #
 # }
 

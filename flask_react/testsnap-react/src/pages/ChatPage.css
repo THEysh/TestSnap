@@ -1,31 +1,45 @@
 .chat-page {
   display: flex;
   height: 100vh;
-  background: #f7f8fa;
-  color: #2c3e50;
+  gap: 12px;
+  padding: 12px;
+  box-sizing: border-box;
+  border-radius: 16px;
+  background: radial-gradient(1200px 600px at 10% 0%, rgba(99,102,241,0.12), transparent 60%),
+    radial-gradient(900px 500px at 90% 20%, rgba(14,165,233,0.10), transparent 55%),
+    #f6f7fb;
+  color: #0f172a;
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 .chat-sider-wrap{
   min-width: 220px;
   max-width: 520px;
   height: 100%;
+  min-height: 0;
+  backdrop-filter: blur(12px);
 }
 .chat-resizer{
-  width: 6px;
+  width: 8px;
   cursor: col-resize;
-  background: linear-gradient(90deg, rgba(226,232,240,0.2), rgba(148,163,184,0.35), rgba(226,232,240,0.2));
+  background: linear-gradient(90deg, rgba(148,163,184,0.12), rgba(148,163,184,0.35), rgba(148,163,184,0.12));
 }
 .chat-sider {
   width: 100%;
-  border-right: 1px solid #e5e7eb;
-  background: #fff;
+  border-right: 1px solid rgba(148,163,184,0.2);
+  background: rgba(255,255,255,0.7);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
+  border-radius: 16px;
+  margin: 0;
+  height: 100%;
+  min-height: 0;
 }
 .chat-sider .sider-header{
-  height: 56px;
-  padding: 0 12px;
-  border-bottom: 1px solid #e5e7eb;
+  height: 64px;
+  padding: 0 16px;
+  border-bottom: 1px solid rgba(148,163,184,0.18);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -42,25 +56,27 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  background: #fff;
+  padding: 8px 12px;
+  border: 1px solid rgba(99,102,241,0.25);
+  border-radius: 10px;
+  background: rgba(99,102,241,0.08);
   color: #4f46e5;
   cursor: pointer;
 }
 .chat-sider .sider-body {
-  padding: 10px;
+  padding: 14px;
   overflow-y: auto;
   overflow-x: hidden;
+  flex: 1;
+  min-height: 0;
 }
 .chat-sider .sider-item{
   position: relative;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  padding: 10px 60px 10px 12px;
-  background: #fff;
-  margin-bottom: 10px;
+  border: 1px solid rgba(148,163,184,0.2);
+  border-radius: 14px;
+  padding: 12px 60px 12px 14px;
+  background: rgba(255,255,255,0.7);
+  margin-bottom: 12px;
   cursor: pointer;
   transition: border-color .15s ease, box-shadow .15s ease, transform .06s ease;
   overflow: hidden;
@@ -73,8 +89,8 @@
   transform: scale(0.99);
 }
 .chat-sider .sider-item.active {
-  border-color: #667eea;
-  background: #f6f7ff;
+  border-color: rgba(99,102,241,0.4);
+  background: rgba(99,102,241,0.08);
 }
 .chat-sider .sider-item-title {
   font-size: 14px;
@@ -119,17 +135,25 @@
   top: 50%;
   transform: translateY(-50%) translateX(100%);
   opacity: 0;
-  padding: 4px 8px;
-  border-radius: 6px;
-  border: 1px solid #fecaca;
-  background: #fff5f5;
-  color: #ef4444;
+  padding: 0 6px;
+  height: 28px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  color: #ff0000;
   cursor: pointer;
   transition: transform .2s ease, opacity .2s ease;
 }
 .chat-sider .sider-item:hover .sider-delete{
   transform: translateY(-50%) translateX(0);
   opacity: 1;
+}
+.chat-sider .sider-delete:hover{
+  border-color: #fbfbfb;
+}
+.chat-sider .sider-delete:focus,
+.chat-sider .sider-delete:focus-visible{
+  outline: none;
+  box-shadow: none;
 }
 .chat-sider .sider-footer{
   margin-top: auto;
@@ -173,23 +197,32 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  gap: 12px;
+  min-height: 0;
 }
 .messages {
   flex: 1;
-  padding: 20px;
+  padding: 22px;
   overflow-y: auto;
-  background: #f8fafc;
+  background: rgba(255,255,255,0.6);
+  border: 1px solid rgba(148,163,184,0.18);
+  border-radius: 18px;
+  margin: 0;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(10px);
 }
 .messages .msg {
   display: flex;
   align-items: flex-start;
   gap: 12px;
   margin-bottom: 16px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
+  background: rgba(255,255,255,0.85);
+  border: 1px solid rgba(148,163,184,0.16);
+  border-radius: 16px;
   padding: 14px 16px;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+  position: relative;
 }
 .messages .msg .role {
   min-width: 44px;
@@ -198,8 +231,8 @@
   border-radius: 999px;
   text-align: center;
   color: #475569;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
+  background: rgba(148,163,184,0.12);
+  border: 1px solid rgba(148,163,184,0.2);
   flex-shrink: 0;
   font-size: 12px;
   line-height: 24px;
@@ -208,7 +241,7 @@
   background: transparent;
   border: none;
   border-radius: 0;
-  padding: 0;
+  padding: 0 56px 0 0;
   max-width: 100%;
   box-shadow: none;
 }
@@ -219,23 +252,32 @@
   padding: 0;
   max-width: 100%;
 }
-.msg-tools{
+.msg-actions{
+  position: absolute;
+  top: 10px;
+  right: 12px;
   display: flex;
-  justify-content: flex-end;
-  margin-bottom: 6px;
+  gap: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s ease;
+}
+.messages .msg:hover .msg-actions{
+  opacity: 1;
+  pointer-events: auto;
 }
 .msg-copy{
-  border: 1px solid #e5e7eb;
-  background: #fff;
+  border: 1px solid rgba(148,163,184,0.2);
+  background: rgba(255,255,255,0.85);
   color: #4f46e5;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 12px;
-  padding: 4px 8px;
+  padding: 6px 10px;
   cursor: pointer;
 }
 .msg-copy:hover{
-  background: #eef2ff;
-  border-color: #c7d2fe;
+  background: rgba(99,102,241,0.08);
+  border-color: rgba(99,102,241,0.35);
 }
 .messages .msg .content .chat-md{
   font-size: 14px;
@@ -321,22 +363,24 @@
   background: transparent;
 }
 .messages .msg.user {
-  background: #eff6ff;
-  border-color: #bfdbfe;
+  background: rgba(59,130,246,0.08);
+  border-color: rgba(59,130,246,0.2);
 }
 .composer {
-  padding: 10px;
+  padding: 0;
   display: flex;
   gap: 8px;
-  border-top: 1px solid #e5e7eb;
-  background: #fff;
+  border-top: none;
+  background: transparent;
   flex-direction: column;
 }
 .chat-settings-wrap{
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  background: #f8fafc;
-  padding: 6px 10px;
+  border: 1px solid rgba(148,163,184,0.18);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.75);
+  padding: 10px 12px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(10px);
 }
 .chat-settings-summary{
   cursor: pointer;
@@ -357,10 +401,10 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #f8fafc;
+  padding: 8px 12px;
+  border: 1px solid rgba(148,163,184,0.2);
+  border-radius: 10px;
+  background: rgba(248,250,252,0.7);
   font-size: 12px;
   color: #334155;
 }
@@ -368,9 +412,9 @@
   color: #64748b;
 }
 .chat-setting-select{
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  padding: 4px 8px;
+  border: 1px solid rgba(148,163,184,0.24);
+  border-radius: 8px;
+  padding: 6px 10px;
   background: #fff;
   font-size: 12px;
   color: #0f172a;
@@ -387,15 +431,15 @@
   cursor: not-allowed;
 }
 .reasoning-block{
-  border: 1px dashed #c7d2fe;
-  background: #eef2ff;
-  border-radius: 10px;
-  padding: 10px 12px;
+  border: 1px solid rgba(99,102,241,0.18);
+  background: rgba(99,102,241,0.08);
+  border-radius: 14px;
+  padding: 12px 14px;
   margin-bottom: 8px;
   overflow: hidden;
 }
 .reasoning-title{
-  font-size: 20px;
+  font-size: 13px;
   color: #4f46e5;
   font-weight: 600;
 }
@@ -483,19 +527,22 @@
 }
 .composer textarea {
   flex: 1;
-  height: 84px;
-  border-radius: 6px;
-  border: 1px solid #e5e7eb;
-  padding: 8px;
+  height: 92px;
+  border-radius: 14px;
+  border: 1px solid rgba(148,163,184,0.24);
+  padding: 12px 14px;
+  background: rgba(255,255,255,0.85);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
 }
 .composer button {
-  padding: 0 16px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  background: #4f46e5;
+  padding: 0 20px;
+  border: 1px solid rgba(79,70,229,0.4);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(99,102,241,0.9), rgba(79,70,229,0.9));
   color: #fff;
-  height: 36px;
+  height: 40px;
   align-self: flex-end;
+  box-shadow: 0 12px 24px rgba(79,70,229,0.22);
 }
 
 .preview-modal{

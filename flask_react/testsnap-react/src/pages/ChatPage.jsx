@@ -71,22 +71,38 @@ export default function ChatPage() {
   const [siderWidth, setSiderWidth] = useState(300);
   const resizeRef = useRef({ dragging: false, startX: 0, startWidth: 300 });
   const modelOptions = useMemo(() => ([
+    "Qwen/Qwen3-8B",
+    "Qwen/Qwen3-VL-235B-A22B-Instruct",
+    "Qwen/Qwen3-VL-235B-A22B-Thinking",
+    "Qwen/Qwen3-Next-80B-A3B-Instruct",
+    "Qwen/Qwen3-Next-80B-A3B-Thinking",
     "Qwen/Qwen2.5-VL-72B-Instruct",
     "Qwen/Qwen2.5-VL-32B-Instruct",
-    "Qwen/Qwen3-8B",
-    "Qwen/Qwen2.5-7B-Instruct",
     "Qwen/Qwen2.5-32B-Instruct",
     "Qwen/Qwen2.5-72B-Instruct-128K",
+    "Qwen/Qwen2.5-7B-Instruct",
     "zai-org/GLM-4.6V",
     "zai-org/GLM-4.6",
-    "deepseek-ai/DeepSeek-V3.2"
+    "deepseek-ai/DeepSeek-V3",
+    "deepseek-ai/DeepSeek-V3.1-Terminus",
+    "deepseek-ai/DeepSeek-V3.2",
+    "deepseek-ai/DeepSeek-R1"
+
   ]), []);
   const canThinkModels = useMemo(() => ([
-    "Pro/zai-org/GLM-5", "Pro/zai-org/GLM-4.7", "deepseek-ai/DeepSeek-V3.2",
-    "Pro/deepseek-ai/DeepSeek-V3.2", "zai-org/GLM-4.6", "Qwen/Qwen3-8B",
-    "Qwen/Qwen3-14B", "Qwen/Qwen3-32B", "Qwen/Qwen3-30B-A3B",
-    "tencent/Hunyuan-A13B-Instruct", "zai-org/GLM-4.5V",
-    "deepseek-ai/DeepSeek-V3.1-Terminus", "Pro/deepseek-ai/DeepSeek-V3.1-Terminus"
+    "Pro/zai-org/GLM-5", 
+    "Pro/zai-org/GLM-4.7", 
+    "deepseek-ai/DeepSeek-V3.2",
+    "Pro/deepseek-ai/DeepSeek-V3.2", 
+    "zai-org/GLM-4.6", 
+    "Qwen/Qwen3-8B",
+    "Qwen/Qwen3-14B", 
+    "Qwen/Qwen3-32B", 
+    "Qwen/Qwen3-30B-A3B",
+    "tencent/Hunyuan-A13B-Instruct", 
+    "zai-org/GLM-4.5V",
+    "deepseek-ai/DeepSeek-V3.1-Terminus", 
+    "Pro/deepseek-ai/DeepSeek-V3.1-Terminus"
   ]), []);
   const [selectedModel, setSelectedModel] = useState(modelOptions[0]);
   const [enableReasoning, setEnableReasoning] = useState(false);
@@ -454,16 +470,17 @@ export default function ChatPage() {
               const copyText = getCopyText(m);
               return (
                 <div key={m.id} className={'msg ' + m.role}>
+                  <div className="msg-actions">
+                    <button
+                      className="msg-copy"
+                      onClick={() => handleCopy(copyText, m.id)}
+                      title="复制"
+                    >
+                      {copiedId === m.id ? '已复制' : '复制'}
+                    </button>
+                  </div>
                   <div className="role">{m.role === 'user' ? '我' : 'AI'}</div>
                   <div className="content">
-                    <div className="msg-tools">
-                      <button
-                        className="msg-copy"
-                        onClick={() => handleCopy(copyText, m.id)}
-                      >
-                        {copiedId === m.id ? '已复制' : '复制'}
-                      </button>
-                    </div>
                     {m.role === 'assistant' && m.meta?.reasoning ? (
                       <details className="reasoning-block" open>
                         <summary className="reasoning-title">思考过程</summary>
@@ -541,15 +558,17 @@ export default function ChatPage() {
                   ))}
                 </select>
               </div>
-              <label className={`chat-setting chat-toggle ${canThink ? '' : 'disabled'}`}>
-                <input
-                  type="checkbox"
-                  checked={enableReasoning && canThink}
-                  onChange={(e) => setEnableReasoning(e.target.checked)}
-                  disabled={!canThink || sending}
-                />
-                <span>思考</span>
-              </label>
+              {canThink ? (
+                <label className="chat-setting chat-toggle">
+                  <input
+                    type="checkbox"
+                    checked={enableReasoning}
+                    onChange={(e) => setEnableReasoning(e.target.checked)}
+                    disabled={sending}
+                  />
+                  <span>思考</span>
+                </label>
+              ) : null}
             </div>
           </details>
           {attachments.length > 0 && (
