@@ -1,3 +1,5 @@
+import json
+
 from flask_react.log import TASK_PROCESS, update_task_progress, complete_task, logger
 from flask import Flask, request, jsonify, send_from_directory, Response
 from flask_cors import CORS
@@ -524,7 +526,8 @@ def api_chat_stream():
         messages = data.get('messages') or []
         if not isinstance(messages, list) or len(messages) == 0:
             return jsonify({'success': False, 'error': 'messages 不能为空'}), 400
-
+        enable_reasoning = data.get('enable_reasoning', False)
+        model_name = data.get('model_name', None)
         def sync_generator():
             try:
                 loop = asyncio.new_event_loop()
@@ -532,24 +535,21 @@ def api_chat_stream():
                     asyncio.set_event_loop(loop)
                 except Exception:
                     pass
-                agen = serve_model_manager.chat_model.achat_stream(messages)
+                agen = serve_model_manager.chat_model.achat_stream(messages, enable_reasoning, model_name)
                 try:
                     while True:
                         try:
                             piece = loop.run_until_complete(agen.__anext__())
                         except StopAsyncIteration:
                             break
-                        if piece is None:
-                            continue
-                        txt = str(piece)
-                        if txt:
-                            txt = txt.replace("\r\n", "\n").replace("\r", "\n")
-                            lines = txt.split("\n")
-                            for line in lines:
-                                yield f"data: {line}\n"
+                        if isinstance(piece, dict):
+                            # 结构化输出 → 转 JSON
+                            json_str = json.dumps(piece, ensure_ascii=False)
+                            yield f"data: {json_str}\n\n"
                         else:
-                            yield "data:\n"
-                        yield "\n"
+                            # 方案1：发送明确的 error 事件
+                            error_msg = "返回的内容无法解析为json"
+                            yield f'event: error\ndata: {json.dumps({"error": error_msg, "detail": str(piece)}, ensure_ascii=False)}\n\n'
                 finally:
                     try:
                         loop.run_until_complete(agen.aclose())
@@ -806,4 +806,4 @@ if __name__ == '__main__':
     # 对话聊天
     print(f"对话聊天： http://localhost:{PORT}/api/chat/stream")
 
-    app.run(host='0.0.0.0', port=PORT, debug=True)
+    app.run(host='0.0.0.0', port=PORT, debug=True, use_reloader=False)

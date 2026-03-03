@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { MessageSquare, Plus, Paperclip, Image as ImageIcon, FileText, Table } from 'lucide-react';
 import './ChatPage.css';
 import '../components/MarkdownViewer.css';
-import { getConversations, createConversation, consumeQueue, addMessage, setTargetConversation, deleteConversation, updateLastAssistantMessage } from '../utils/chatStorage';
+import { getConversations, createConversation, consumeQueue, addMessage, setTargetConversation, deleteConversation, updateLastAssistantMessage, updateLastAssistantReasoning } from '../utils/chatStorage';
 import ChatMarkdown from './ChatMarkdown';
 import { buildMessages } from '../utils/buildChatMessages';
 
@@ -67,6 +67,65 @@ export default function ChatPage() {
   const [preview, setPreview] = useState({ open: false, data: null });
   const previewContentRef = useRef(null);
   const [sending, setSending] = useState(false);
+  const [copiedId, setCopiedId] = useState(null);
+  const [siderWidth, setSiderWidth] = useState(300);
+  const resizeRef = useRef({ dragging: false, startX: 0, startWidth: 300 });
+  const modelOptions = useMemo(() => ([
+    "Qwen/Qwen2.5-VL-72B-Instruct",
+    "Qwen/Qwen2.5-VL-32B-Instruct",
+    "Qwen/Qwen3-8B",
+    "Qwen/Qwen2.5-7B-Instruct",
+    "Qwen/Qwen2.5-32B-Instruct",
+    "Qwen/Qwen2.5-72B-Instruct-128K",
+    "zai-org/GLM-4.6V",
+    "zai-org/GLM-4.6",
+    "deepseek-ai/DeepSeek-V3.2"
+  ]), []);
+  const canThinkModels = useMemo(() => ([
+    "Pro/zai-org/GLM-5", "Pro/zai-org/GLM-4.7", "deepseek-ai/DeepSeek-V3.2",
+    "Pro/deepseek-ai/DeepSeek-V3.2", "zai-org/GLM-4.6", "Qwen/Qwen3-8B",
+    "Qwen/Qwen3-14B", "Qwen/Qwen3-32B", "Qwen/Qwen3-30B-A3B",
+    "tencent/Hunyuan-A13B-Instruct", "zai-org/GLM-4.5V",
+    "deepseek-ai/DeepSeek-V3.1-Terminus", "Pro/deepseek-ai/DeepSeek-V3.1-Terminus"
+  ]), []);
+  const [selectedModel, setSelectedModel] = useState(modelOptions[0]);
+  const [enableReasoning, setEnableReasoning] = useState(false);
+  const canThink = useMemo(() => canThinkModels.includes(selectedModel), [canThinkModels, selectedModel]);
+
+  const handleCopy = async (text, id) => {
+    const value = (text || '').trim();
+    if (!value) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const area = document.createElement('textarea');
+        area.value = value;
+        area.style.position = 'fixed';
+        area.style.opacity = '0';
+        document.body.appendChild(area);
+        area.focus();
+        area.select();
+        document.execCommand('copy');
+        document.body.removeChild(area);
+      }
+      setCopiedId(id);
+      setTimeout(() => {
+        setCopiedId((prev) => (prev === id ? null : prev));
+      }, 1500);
+    } catch (_) {
+      setCopiedId(null);
+    }
+  };
+
+  const getCopyText = (msg) => {
+    const content = msg?.content || '';
+    const reasoning = msg?.meta?.reasoning || '';
+    if (msg?.role === 'assistant' && reasoning) {
+      return `思考过程:\n${reasoning}\n\n回复:\n${content}`;
+    }
+    return content;
+  };
 
   const callChatAPI = async (payload) => {
     const endpoints = ['/api/chat'];
@@ -154,6 +213,10 @@ export default function ChatPage() {
           try {
             const obj = JSON.parse(payloadStr);
             if (obj && typeof obj === 'object') {
+              if (obj.type && obj.content) {
+                if (onChunk) onChunk({ type: obj.type, content: obj.content });
+                return false;
+              }
               piece = obj.delta || obj.content || obj.text || obj.message || '';
               if (!piece && Array.isArray(obj.choices) && obj.choices[0]?.delta?.content) {
                 piece = obj.choices[0].delta.content;
@@ -188,6 +251,31 @@ export default function ChatPage() {
     }
     return { success: false, error: '未知错误' };
   };
+  useEffect(() => {
+    if (!canThink && enableReasoning) {
+      setEnableReasoning(false);
+    }
+  }, [canThink, enableReasoning]);
+
+  useEffect(() => {
+    const handleMove = (e) => {
+      if (!resizeRef.current.dragging) return;
+      const dx = e.clientX - resizeRef.current.startX;
+      const next = Math.min(520, Math.max(220, resizeRef.current.startWidth + dx));
+      setSiderWidth(next);
+    };
+    const handleUp = () => {
+      if (!resizeRef.current.dragging) return;
+      resizeRef.current.dragging = false;
+    };
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+    };
+  }, []);
+
   useEffect(() => {
     const existing = getConversations();
     setConvs(existing);
@@ -288,13 +376,27 @@ export default function ChatPage() {
     addMessage(convId, { role: 'assistant', content: '' });
     setConvs(getConversations());
     // 流式优先
-    streamChatAPI({ messages }, (piece) => {
-      updateLastAssistantMessage(convId, piece);
+    const payload = {
+      messages,
+      model_name: selectedModel,
+      enable_reasoning: enableReasoning && canThink
+    };
+    streamChatAPI(payload, (piece) => {
+      if (typeof piece === 'string') {
+        updateLastAssistantMessage(convId, piece);
+      } else if (piece && typeof piece === 'object') {
+        if (piece.type === 'reasoning') {
+          updateLastAssistantReasoning(convId, piece.content || '');
+        } else if (piece.type === 'content') {
+          updateLastAssistantMessage(convId, piece.content || '');
+        } else if (piece.type === 'error') {
+          updateLastAssistantMessage(convId, `\n\n[错误] ${piece.content || ''}`);
+        }
+      }
       setConvs(getConversations());
     }).then((ret) => {
       if (!ret.success) {
-        // 回退非流式
-        return callChatAPI({ messages }).then(data => {
+        return callChatAPI(payload).then(data => {
           const reply = data && data.success ? (data.reply || '') : (data && data.error ? `调用失败：${data.error}` : '调用失败');
           updateLastAssistantMessage(convId, reply);
           setConvs(getConversations());
@@ -313,25 +415,35 @@ export default function ChatPage() {
 
   return (
     <div className="chat-page">
-      <Sidebar
-        convs={convs}
-        activeId={activeId}
-        onSelect={setActiveId}
-        onCreate={handleCreate}
-        onDelete={(id) => {
-          const remained = deleteConversation(id);
-          setConvs(remained);
-          if (id === activeId) {
-            if (remained.length > 0) {
-              setActiveId(remained[0].id);
-              setTargetConversation(remained[0].id);
-            } else {
-              const conv = createConversation({ title: '新对话' });
-              setConvs(getConversations());
-              setActiveId(conv.id);
-              setTargetConversation(conv.id);
+      <div className="chat-sider-wrap" style={{ width: siderWidth }}>
+        <Sidebar
+          convs={convs}
+          activeId={activeId}
+          onSelect={setActiveId}
+          onCreate={handleCreate}
+          onDelete={(id) => {
+            const remained = deleteConversation(id);
+            setConvs(remained);
+            if (id === activeId) {
+              if (remained.length > 0) {
+                setActiveId(remained[0].id);
+                setTargetConversation(remained[0].id);
+              } else {
+                const conv = createConversation({ title: '新对话' });
+                setConvs(getConversations());
+                setActiveId(conv.id);
+                setTargetConversation(conv.id);
+              }
             }
-          }
+          }}
+        />
+      </div>
+      <div
+        className="chat-resizer"
+        onMouseDown={(e) => {
+          resizeRef.current.dragging = true;
+          resizeRef.current.startX = e.clientX;
+          resizeRef.current.startWidth = siderWidth;
         }}
       />
       <div className="chat-main">
@@ -339,10 +451,27 @@ export default function ChatPage() {
           {activeConv ? (
             activeConv.messages.map((m) => {
               const atts = m.meta?.attachments || [];
+              const copyText = getCopyText(m);
               return (
                 <div key={m.id} className={'msg ' + m.role}>
                   <div className="role">{m.role === 'user' ? '我' : 'AI'}</div>
                   <div className="content">
+                    <div className="msg-tools">
+                      <button
+                        className="msg-copy"
+                        onClick={() => handleCopy(copyText, m.id)}
+                      >
+                        {copiedId === m.id ? '已复制' : '复制'}
+                      </button>
+                    </div>
+                    {m.role === 'assistant' && m.meta?.reasoning ? (
+                      <details className="reasoning-block" open>
+                        <summary className="reasoning-title">思考过程</summary>
+                        <div className="reasoning-body">
+                          <ChatMarkdown content={m.meta.reasoning} />
+                        </div>
+                      </details>
+                    ) : null}
                     {atts.length > 0 && (
                       <div className="msg-attachments">
                         {atts.map((a, i) => (
@@ -396,6 +525,33 @@ export default function ChatPage() {
           )}
         </div>
         <div className="composer">
+          <details className="chat-settings-wrap" open>
+            <summary className="chat-settings-summary">模型与思考</summary>
+            <div className="chat-settings">
+              <div className="chat-setting">
+                <span className="chat-setting-label">模型</span>
+                <select
+                  className="chat-setting-select"
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  disabled={sending}
+                >
+                  {modelOptions.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+              <label className={`chat-setting chat-toggle ${canThink ? '' : 'disabled'}`}>
+                <input
+                  type="checkbox"
+                  checked={enableReasoning && canThink}
+                  onChange={(e) => setEnableReasoning(e.target.checked)}
+                  disabled={!canThink || sending}
+                />
+                <span>思考</span>
+              </label>
+            </div>
+          </details>
           {attachments.length > 0 && (
             <div className="attachments">
               <div className="attachments-title">

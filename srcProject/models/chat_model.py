@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any, Union, Optional, AsyncGenerator
 from openai import AsyncOpenAI
 from srcProject.models.model_base import BaseModel
 from srcProject.config.settings import CHAT_API_KEY, CHAT_URL, CHAT_MODEL_NAME
@@ -10,10 +10,19 @@ import mimetypes
 from urllib.parse import urlparse
 from srcProject.utlis.common import find_project_root
 
+can_think_models = [
+    "Pro/zai-org/GLM-5", "Pro/zai-org/GLM-4.7", "deepseek-ai/DeepSeek-V3.2",
+    "Pro/deepseek-ai/DeepSeek-V3.2", "zai-org/GLM-4.6", "Qwen/Qwen3-8B",
+    "Qwen/Qwen3-14B", "Qwen/Qwen3-32B", "Qwen/Qwen3-30B-A3B",
+    "tencent/Hunyuan-A13B-Instruct", "zai-org/GLM-4.5V",
+    "deepseek-ai/DeepSeek-V3.1-Terminus", "Pro/deepseek-ai/DeepSeek-V3.1-Terminus"
+]
+
 class SiliconChatModel(BaseModel):
     """
     面向对话的 SiliconFlow(OpenAI 兼容) 客户端
     继承 BaseModel 以统一项目模型管理方式
+    支持通过 enable_reasoning 参数控制思考流程
     """
 
     def __init__(self,
@@ -96,7 +105,8 @@ class SiliconChatModel(BaseModel):
             if url.startswith("data:"):
                 return url
             u = urlparse(url)
-            if u.scheme in ("http", "https") and u.path.startswith("/api/files/") and u.hostname in ("localhost", "127.0.0.1"):
+            if u.scheme in ("http", "https") and u.path.startswith("/api/files/") and u.hostname in (
+            "localhost", "127.0.0.1"):
                 rel = u.path[len("/api/files/"):]
                 base = find_project_root()
                 full = os.path.join(base, rel)
@@ -112,30 +122,71 @@ class SiliconChatModel(BaseModel):
         except Exception:
             return url
 
-    async def achat_stream(self, messages: List[Dict[str, Any]]):
+    async def achat_stream(self, messages: List[Dict[str, Any]],
+                           enable_reasoning : bool = False,
+                           model : str = None) -> AsyncGenerator[
+        Union[str, Dict[str, str]], None]:
         """
-        异步流式聊天：只返回content内容，不包含reasoning_content
+        异步流式聊天
+
+        Args:
+            messages: 消息列表
+            model : 网络模型
+            enable_reasoning: 是否开启思考流程
+                - True: 如果模型支持，返回包含 reasoning_content 和 content
+                - False: 只返回 content 内容（默认行为，与原来一致）
+        Yields:
+            - 当 enable_reasoning=False 时: 只返回 content 字符串（保持向后兼容）
+            - 当 enable_reasoning=True 时: 返回 {"type": "reasoning"/"content", "content": str} 字典
         """
         norm_messages = self._normalize_messages(messages)
-        resp = await self.client.chat.completions.create(
-            model=self._model_name,
-            messages=norm_messages,
-            stream=True
-        )
-        async for chunk in resp:
-            if not chunk.choices:
-                continue
-            delta = chunk.choices[0].delta
-            if not delta:
-                continue
-            # 只返回content内容，忽略reasoning_content
-            ct = getattr(delta, "content", None)
-            if ct:
-                try:
-                    print(ct,end='')
-                    yield str(ct)
-                except Exception:
-                    yield ct
+        # 构建基础请求参数
+        if model is not None:
+            self._model_name = model
+        request_params = {
+            "model": self._model_name,
+            "messages": norm_messages,
+            "stream": True
+        }
+        if enable_reasoning and self._model_name in can_think_models:
+            request_params["extra_body"] = {
+                        "enable_thinking": enable_reasoning,
+                        "thinking_budget": 2048  # 控制思考过程最大长度为1000 token
+                    }
+        else: enable_reasoning = False
+        try:
+            resp = await self.client.chat.completions.create(**request_params)
+            async for chunk in resp:
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
+                if not delta:
+                    continue
+                if enable_reasoning:
+                    # 开启思考模式：返回结构化数据
+                    # 检查思考内容
+                    reasoning = getattr(delta, "reasoning_content", None)
+                    if reasoning:
+                        yield {"type": "reasoning", "content": str(reasoning)}
+
+                    # 检查最终内容
+                    ct = getattr(delta, "content", None)
+                    if ct:
+                        yield {"type": "content", "content": str(ct)}
+                else:
+                    # 兼容原有模式：只返回content内容
+                    ct = getattr(delta, "content", None)
+                    if ct:
+                        yield {"type": "content", "content": str(ct)}
+        except Exception as e:
+            error_msg = f"API调用错误: {str(e)}"
+            print(error_msg)
+            # 可以选择是否将错误传递给调用方
+            if enable_reasoning:
+                yield {"type": "error", "content": error_msg}
+            else:
+                yield f"[错误: {error_msg}]"
+
 
 # 这个是后端的接口示例：
 #

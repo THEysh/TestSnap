@@ -86,3 +86,20 @@ export function updateLastAssistantMessage(convId, appendText) {
   return convs[idx];
 }
 
+export function updateLastAssistantReasoning(convId, appendText) {
+  const convs = getConversations();
+  const idx = convs.findIndex(c => c.id === convId);
+  if (idx === -1) return null;
+  const msgs = convs[idx].messages || [];
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    if (msgs[i].role === 'assistant') {
+      const meta = msgs[i].meta || {};
+      meta.reasoning = (meta.reasoning || '') + appendText;
+      msgs[i].meta = meta;
+      break;
+    }
+  }
+  saveConversations(convs);
+  return convs[idx];
+}
+

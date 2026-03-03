@@ -18,8 +18,8 @@ export const initExternalLibs = () => {
     mathJaxConfig.textContent = `
       window.MathJax = {
         tex: {
-          inlineMath: [['$', '$'], ['\\(', '\\)']],
-          displayMath: [['$$', '$$'], ['\\[', '\\]']],
+          inlineMath: [['$', '$']],
+          displayMath: [['$$', '$$']],
           processEscapes: true,
           processEnvironments: true,
           tags: 'ams'

@@ -30,11 +30,12 @@ const useMarkdownRenderer = () => {
     const parts = [];
     for (let i = 0; i < blocks.length; i++) {
       const raw = blocks[i];
+      const normalizedRaw = normalizeMathDelimiters(raw);
       let frag = '';
       try {
-        frag = window.marked.parse(raw);
+        frag = window.marked.parse(normalizedRaw);
       } catch (e) {
-        frag = window.marked.parse(raw || '');
+        frag = window.marked.parse(normalizedRaw || '');
       }
       parts.push(`<div class="md-block" data-raw-md="${encodeURIComponent(raw)}">${frag}</div>`);
     }
@@ -123,6 +124,32 @@ function splitMdBlocks(src) {
   }
   if (buf.length) blocks.push(buf.join('\n'));
   return blocks;
+}
+
+function normalizeMathDelimiters(src) {
+  const lines = src.split(/\r?\n/);
+  const out = [];
+  let inFence = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const fenceMatch = line.match(/^(```+|~~~+)/);
+    if (fenceMatch) {
+      inFence = !inFence;
+      out.push(line);
+      continue;
+    }
+    if (inFence) {
+      out.push(line);
+      continue;
+    }
+    const replaced = line
+      .replace(/\\\[/g, '$$')
+      .replace(/\\\]/g, '$$')
+      .replace(/\\\(/g, '$')
+      .replace(/\\\)/g, '$');
+    out.push(replaced);
+  }
+  return out.join('\n');
 }
 
 export default useMarkdownRenderer;
