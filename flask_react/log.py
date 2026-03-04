@@ -1,8 +1,10 @@
 import threading
 import time
 import logging
+import queue
 # 存储任务进度的字典，键为任务ID，值包含进度信息
 TASK_PROCESS = {}
+TASK_STREAMS = {}
 # 配置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('TextSnapServer')
@@ -67,6 +69,26 @@ def complete_task(task_id, result=None, error=None):
     cleanup_thread = threading.Thread(target=cleanup_task)
     cleanup_thread.daemon = True
     cleanup_thread.start()
+
+def init_task_stream(task_id):
+    TASK_STREAMS[task_id] = queue.Queue()
+
+def get_task_stream(task_id):
+    return TASK_STREAMS.get(task_id)
+
+def push_task_stream(task_id, payload):
+    task_stream = TASK_STREAMS.get(task_id)
+    if task_stream:
+        task_stream.put(payload)
+
+def close_task_stream(task_id):
+    task_stream = TASK_STREAMS.get(task_id)
+    if task_stream:
+        task_stream.put({"type": "done"})
+
+def remove_task_stream(task_id):
+    if task_id in TASK_STREAMS:
+        del TASK_STREAMS[task_id]
 
 # 用于处理进度的函数
 async def handle_progress(task_id, completed_count, total_tasks):

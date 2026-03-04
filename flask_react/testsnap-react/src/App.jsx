@@ -38,6 +38,7 @@ function App() {
     processedFileUrl, 
     downloadLink, 
     autoLoadMarkdownPath, 
+    streamContent,
     process, 
     reset: resetProcess 
   } = useFileProcess();
@@ -90,8 +91,6 @@ function App() {
         onClearFile={handleClearFile}
         file={file}
         status={getCurrentStatus()}
-        progress={progress}
-        progressMessage={progressMessage}
         fileType={fileType}
       />
       <div className="pdf-container">
@@ -115,7 +114,13 @@ function App() {
         )}
       </div>
       <div className="markdown-container">
-        <MarkdownViewer autoLoadPath={autoLoadMarkdownPath} />
+        <MarkdownViewer
+          autoLoadPath={autoLoadMarkdownPath}
+          streamContent={streamContent}
+          streamActive={processStatus === 'processing'}
+          progress={progress}
+          progressMessage={progressMessage}
+        />
       </div>
     </div>
   );

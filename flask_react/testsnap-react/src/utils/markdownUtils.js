@@ -5,8 +5,14 @@ import { ENDPOINTS } from '../constants/apiConfig';
 export const updateImagePaths = (content, baseDir) => {
   const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
   return content.replace(imgRegex, (match, alt, path) => {
-    // 检查路径是否已经是绝对路径或包含http
-    if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('/api/')) {
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return match;
+    }
+    if (path.startsWith('/api/files/')) {
+      const relative = path.substring('/api/files/'.length);
+      return `![${alt}](${ENDPOINTS.FILES}${relative})`;
+    }
+    if (path.startsWith('/api/')) {
       return match;
     }
 

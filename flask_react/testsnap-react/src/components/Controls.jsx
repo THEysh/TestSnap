@@ -3,10 +3,9 @@ import './Controls.css';
 import React from 'react';
 import useFileSelector from '../hooks/useFileSelector';
 import StatusMessage from './StatusMessage';
-import ProgressBar from './ProgressBar';
 import { formatFileSize } from '../utils/fileUtils';
 import ModelConfig from './ModelConfig.jsx';
-const Controls = ({ onFileUpload, onFileProcess, onClearFile, file, status, progress, progressMessage, fileType }) => {
+const Controls = ({ onFileUpload, onFileProcess, onClearFile, file, status, fileType }) => {
   const { dragActive, fileInputRef, handleDrag, handleFileChange, openFileDialog } = useFileSelector();
   
   const getStatusMessage = () => {
@@ -70,8 +69,6 @@ const Controls = ({ onFileUpload, onFileProcess, onClearFile, file, status, prog
           </div>
         </div>
       )}
-      
-      <ProgressBar progress={progress} message={progressMessage} />
       
       <div className="action-buttons">
         <button

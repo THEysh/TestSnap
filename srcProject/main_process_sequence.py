@@ -7,8 +7,7 @@ from srcProject.config.constants import OCR_TEXT_VALUES, BlockType_MEMBER, Block
 from srcProject.data_loaders.pdf_dataset import PDFDataset
 from srcProject.models.layout_reader import find_reading_order_index
 from srcProject.models.model_manager import ModelManager
-from srcProject.utlis.aftertreatment import batch_preprocess_detections, normalize_polygons_to_bboxes, poly_to_bbox, \
-    convert_html_tables_to_markdown
+from srcProject.utlis.aftertreatment import batch_preprocess_detections, poly_to_bbox, convert_html_tables_to_markdown
 from srcProject.utlis.common import find_project_root, prepare_directory
 from srcProject.utlis.visualization.visualize_document import visualize_document
 import os
@@ -16,7 +15,7 @@ import os
 
 model_manager = ModelManager()
 
-async def layout_prediction(input_path: str, bool_ocr = True, task_id = None) -> List[List[Dict[str, Any]]]:
+async def layout_prediction(input_path: str, bool_ocr = True, task_id = None, stream_callback=None, stream_image_dir=None, stream_api_base_url=None) -> List[List[Dict[str, Any]]]:
     """
     处理单个文档，执行布局分析、文本提取和结构化，并进行可视化。
     """
@@ -59,14 +58,20 @@ async def layout_prediction(input_path: str, bool_ocr = True, task_id = None) ->
     print("布局预测iou过滤完成")
     # 调用异步OCR函数
     if bool_ocr:
-        filtered_detections = await ocr_test(data=filtered_detections,task_id=task_id,
-                                             progress_callback=handle_progress)
+        filtered_detections = await ocr_test(
+            data=filtered_detections,
+            task_id=task_id,
+            progress_callback=handle_progress,
+            stream_callback=stream_callback,
+            stream_image_dir=stream_image_dir,
+            stream_api_base_url=stream_api_base_url
+        )
     return filtered_detections
 
 
 async def ocr_test(data: List[List[Dict[str, Any]]],
                    max_concurrent_tasks: int = 30,
-                   task_id=None, progress_callback=None):  # 新增参数
+                   task_id=None, progress_callback=None, stream_callback=None, stream_image_dir=None, stream_api_base_url=None):
 
     ocr_tasks = []
     semaphore = asyncio.Semaphore(max_concurrent_tasks)
@@ -85,6 +90,9 @@ async def ocr_test(data: List[List[Dict[str, Any]]],
                 )
             except Exception:
                 text = ""
+            chunk = format_stream_content(inf, text)
+            if stream_callback and chunk:
+                stream_callback(task_id, {"type": "append", "content": chunk})
             completed_count += 1
             # 当任务完成时，调用回调函数
             if progress_callback:
@@ -94,9 +102,20 @@ async def ocr_test(data: List[List[Dict[str, Any]]],
 
     for i in range(len(data)):
         for j in range(len(data[i])):
-            if isinstance(data[i][j], dict) and data[i][j]['category_id'] in OCR_TEXT_VALUES:
-                category_id = int(data[i][j]['category_id'])
-                blockquote = BlockType_MEMBER[category_id]
+            if not isinstance(data[i][j], dict):
+                continue
+            category_id = int(data[i][j]['category_id'])
+            blockquote = BlockType_MEMBER.get(category_id)
+            if blockquote == BlockType.FIGURE:
+                if stream_callback:
+                    image_path = save_stream_image(data[i][j].get('cropped_image'), stream_image_dir, i, j)
+                    if image_path:
+                        stream_callback(
+                            task_id,
+                            {"type": "append", "content": format_stream_image(image_path, i, j, stream_api_base_url)}
+                        )
+                continue
+            if category_id in OCR_TEXT_VALUES:
                 task = asyncio.create_task(run_ocr_task(data[i][j]['cropped_image'], i, j, blockquote))
                 ocr_tasks.append(task)
 
@@ -114,6 +133,37 @@ async def ocr_test(data: List[List[Dict[str, Any]]],
         data[i_idx][j_idx]['text'] = text
 
     return data
+
+def format_stream_content(category_key_enum: BlockType, content: str) -> str:
+    if not content:
+        return ""
+    content = content.replace("```html", "").replace("```markdown", "").replace("```", "")
+    if category_key_enum == BlockType.TITLE:
+        return f"## {content}\n\n"
+    if category_key_enum in [BlockType.PLAIN_TEXT, BlockType.ISOLATE_FORMULA]:
+        return f"{content}\n\n"
+    if category_key_enum in [BlockType.FIGURE_CAPTION, BlockType.TABLE_CAPTION, BlockType.TABLE_FOOTNOTE]:
+        return f"_{content}_\n\n"
+    if category_key_enum == BlockType.TABLE:
+        content = convert_html_tables_to_markdown(content)
+        return f"{content}\n\n"
+    return ""
+
+def format_stream_image(relative_path: str, page_index: int, block_index: int, api_base_url: str | None) -> str:
+    if api_base_url:
+        base = api_base_url.rstrip("/")
+        return f"![{page_index}-{block_index}]({base}/files/{relative_path})\n\n"
+    return f"![{page_index}-{block_index}](/api/files/{relative_path})\n\n"
+
+def save_stream_image(cropped_image: Image.Image, stream_image_dir: str, page_index: int, block_index: int) -> str:
+    if not cropped_image or not stream_image_dir:
+        return ""
+    os.makedirs(stream_image_dir, exist_ok=True)
+    filename = f"p{page_index}_b{block_index}.png"
+    abs_path = os.path.join(stream_image_dir, filename)
+    cropped_image.save(abs_path)
+    relative_path = os.path.relpath(abs_path, find_project_root()).replace("\\", "/")
+    return relative_path
 
 
 def read_prediction(data:List[List[Dict[str, Any]]], task_id = None)->List[List[int]]:
@@ -180,10 +230,23 @@ def generate_markdown_document(data: List[List[Dict[str, Any]]], reading_order: 
     print(f"Markdown文档已生成并保存到: {output_path}")
     return final_markdown
 
-async def main(path, task_id=None):
+async def main(path, task_id=None, stream_callback=None, stream_api_base_url=None):
     sample_path = os.path.join(find_project_root(), path)
     file_name_without_extension, file_extension = os.path.splitext(os.path.basename(sample_path))
-    detections = await layout_prediction(sample_path, bool_ocr=True, task_id=task_id)
+    stream_image_dir = os.path.join(
+        find_project_root(),
+        "srcProject/output/visualizations",
+        file_name_without_extension,
+        "images"
+    )
+    detections = await layout_prediction(
+        sample_path,
+        bool_ocr=True,
+        task_id=task_id,
+        stream_callback=stream_callback,
+        stream_image_dir=stream_image_dir,
+        stream_api_base_url=stream_api_base_url
+    )
     page_order = read_prediction(detections, task_id=task_id)
 
     visualize_path = visualize_document(

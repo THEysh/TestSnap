@@ -11,12 +11,14 @@ const useFileProcess = () => {
   const [autoLoadMarkdownPath, setAutoLoadMarkdownPath] = useState(null);
   const [error, setError] = useState(null);
   const [taskId, setTaskId] = useState(null);
+  const [streamContent, setStreamContent] = useState('');
 
   const process = async (filename, isPdf) => {
     setStatus('processing');
     setProgress(0);
     setProgressMessage('');
     setError(null);
+    setStreamContent('');
     
     try {
       const result = await processFile(filename, isPdf);
@@ -100,6 +102,65 @@ const useFileProcess = () => {
     };
   }, [taskId, status]);
 
+  useEffect(() => {
+    if (!taskId || status !== 'processing') return;
+    const controller = new AbortController();
+    const run = async () => {
+      try {
+        const res = await fetch(`${ENDPOINTS.OCR_STREAM}${taskId}`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+          },
+          signal: controller.signal
+        });
+        if (!res.ok || !res.body) return;
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          while (true) {
+            const idx = buffer.indexOf('\n\n');
+            if (idx === -1) break;
+            const event = buffer.slice(0, idx);
+            buffer = buffer.slice(idx + 2);
+            const lines = event.split('\n');
+            let eventType = 'message';
+            const dataLines = [];
+            for (const line of lines) {
+              if (line.startsWith('event:')) {
+                eventType = line.slice(6).trim();
+              } else if (line.startsWith('data:')) {
+                dataLines.push(line.slice(5).trimStart());
+              }
+            }
+            const dataStr = dataLines.join('\n');
+            if (eventType === 'done' || dataStr === '[DONE]') {
+              return;
+            }
+            if (!dataStr) continue;
+            try {
+              const payload = JSON.parse(dataStr);
+              if (payload?.type === 'append' && payload.content) {
+                setStreamContent(prev => prev + payload.content);
+              }
+            } catch (e) {
+              continue;
+            }
+          }
+        }
+      } catch (e) {
+        return;
+      }
+    };
+    run();
+    return () => controller.abort();
+  }, [taskId, status]);
+
   return {
     status,
     progress,
@@ -107,6 +168,7 @@ const useFileProcess = () => {
     processedFileUrl,
     downloadLink,
     autoLoadMarkdownPath,
+    streamContent,
     error,
     process,
     reset: () => {
@@ -118,6 +180,7 @@ const useFileProcess = () => {
       setAutoLoadMarkdownPath(null);
       setError(null);
       setTaskId(null);
+      setStreamContent('');
     }
   };
 };

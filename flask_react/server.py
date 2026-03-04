@@ -1,5 +1,6 @@
 import json
-from flask_react.log import TASK_PROCESS, update_task_progress, complete_task, logger
+import queue
+from flask_react.log import TASK_PROCESS, update_task_progress, complete_task, logger, init_task_stream, get_task_stream, push_task_stream, close_task_stream, remove_task_stream
 from flask import Flask, request, jsonify, send_from_directory, Response
 from flask_cors import CORS
 import os
@@ -21,6 +22,7 @@ app = Flask(__name__)
 CORS(app)  # 允许跨域请求
 # 获取项目根目录
 project_root = find_project_root()
+API_BASE_URL = os.getenv('TEXTSNAP_API_BASE_URL', 'http://127.0.0.1:7861/api')
 # 设置静态文件类型
 mimetypes.add_type('image/webp', '.webp')
 mimetypes.add_type('image/svg+xml', '.svg')
@@ -115,6 +117,34 @@ def list_tasks():
             'success': False,
             'error': f'获取任务列表失败: {str(e)}'
         }), 500
+
+@app.route('/api/task/ocr/stream/<task_id>', methods=['GET'])
+def stream_ocr(task_id):
+    task_stream = get_task_stream(task_id)
+    if not task_stream:
+        return jsonify({'success': False, 'error': '任务不存在或已完成'}), 404
+    def sync_generator():
+        try:
+            while True:
+                try:
+                    payload = task_stream.get(timeout=1)
+                except queue.Empty:
+                    yield ":\n\n"
+                    continue
+                if isinstance(payload, dict) and payload.get("type") == "done":
+                    yield "event: done\ndata: [DONE]\n\n"
+                    break
+                if not isinstance(payload, dict):
+                    payload = {"type": "append", "content": str(payload)}
+                json_str = json.dumps(payload, ensure_ascii=False)
+                yield f"data: {json_str}\n\n"
+        finally:
+            remove_task_stream(task_id)
+    resp = Response(sync_generator(), mimetype='text/event-stream')
+    resp.headers['Cache-Control'] = 'no-cache'
+    resp.headers['Connection'] = 'keep-alive'
+    resp.headers['X-Accel-Buffering'] = 'no'
+    return resp
 
 
 @app.route('/api/markdown', methods=['POST'])
@@ -391,6 +421,7 @@ def process_file_async(filename, file_type):
             'created_at': time.time(),
             'updated_at': time.time()
         }
+        init_task_stream(task_id)
 
         logger.info(f"创建任务 {task_id}: 处理{file_type}文件 {filename}")
 
@@ -410,6 +441,8 @@ def process_file_async(filename, file_type):
             except Exception as e:
                 logger.error(f"任务 {task_id} 处理异常: {str(e)}")
                 complete_task(task_id, error=f'处理失败: {str(e)}')
+            finally:
+                close_task_stream(task_id)
 
         thread = threading.Thread(target=process_worker)
         thread.daemon = True
@@ -471,7 +504,12 @@ def process_pdf_image(file_path, task_id=None):
         if task_id:
             update_task_progress(task_id, 5, 'processing', '正在执行核心处理...')
 
-        md_save_path, visualize_path = loop.run_until_complete(main(file_path, task_id))
+        def stream_callback(local_task_id, payload):
+            if local_task_id:
+                push_task_stream(local_task_id, payload)
+        md_save_path, visualize_path = loop.run_until_complete(
+            main(file_path, task_id, stream_callback=stream_callback, stream_api_base_url=API_BASE_URL)
+        )
 
         # 更新进度：处理完成，检查结果
         if task_id:

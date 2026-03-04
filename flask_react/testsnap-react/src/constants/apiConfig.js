@@ -7,6 +7,7 @@ export const ENDPOINTS = {
   IMAGE_UPLOAD: `${API_BASE_URL}/image/upload`,
   IMAGE_PROCESS: `${API_BASE_URL}/image/process`,
   TASK_PROGRESS: `${API_BASE_URL}/task/progress/`,
+  OCR_STREAM: `${API_BASE_URL}/task/ocr/stream/`,
   FILES: `${API_BASE_URL}/files/`,
   MARKDOWN: `${API_BASE_URL}/markdown`,
   MODEL_CONFIG: `${API_BASE_URL}/update/model_config`

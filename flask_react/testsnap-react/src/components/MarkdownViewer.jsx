@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import './MarkdownViewer.css';
 import useMarkdownLoader from '../hooks/useMarkdownLoader';
 import useMarkdownRenderer from '../hooks/useMarkdownRenderer';
+import ProgressBar from './ProgressBar';
 import { updateImagePaths } from '../utils/markdownUtils';
 
-const MarkdownViewer = ({ autoLoadPath }) => {
+const MarkdownViewer = ({ autoLoadPath, streamContent, streamActive, progress, progressMessage }) => {
   const [filePath, setFilePath] = useState('');
   const [markdownContent, setMarkdownContent] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
@@ -102,6 +103,14 @@ const MarkdownViewer = ({ autoLoadPath }) => {
     }
   }, [content, filePath]);
 
+  useEffect(() => {
+    if (!streamActive) return;
+    if (streamContent === null || streamContent === undefined) return;
+    const updatedContent = updateImagePaths(streamContent, fileDir);
+    setMarkdownContent(updatedContent);
+    debouncedRender(updatedContent);
+  }, [streamContent, streamActive, fileDir]);
+
   return (
     <div className="markdown-container">
       <div className="header">
@@ -132,6 +141,7 @@ const MarkdownViewer = ({ autoLoadPath }) => {
           </div>
         )}
       </div>
+      <ProgressBar progress={progress} message={progressMessage} />
 
       <div className="editor-container">
         <div className="editor-pane">
