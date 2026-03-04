@@ -1,5 +1,4 @@
 import json
-
 from flask_react.log import TASK_PROCESS, update_task_progress, complete_task, logger
 from flask import Flask, request, jsonify, send_from_directory, Response
 from flask_cors import CORS
@@ -806,4 +805,4 @@ if __name__ == '__main__':
     # 对话聊天
     print(f"对话聊天： http://localhost:{PORT}/api/chat/stream")
 
-    app.run(host='0.0.0.0', port=PORT, debug=True, use_reloader=False)
+    app.run(host='0.0.0.0', port=PORT, debug=False, use_reloader=False)

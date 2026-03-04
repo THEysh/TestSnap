@@ -9,3 +9,4 @@ configs_github.yaml
 .env
 __pycache__/
 *.pyc
+

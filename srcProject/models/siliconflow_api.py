@@ -17,7 +17,9 @@ class Silicon(FlowOCR):
             self.api_keys = api_keys
         self.client = AsyncOpenAI(
             api_key=self.api_keys[0],
-            base_url=base_url
+            base_url=base_url,
+            timeout=60.0,
+            max_retries=2
         )
         super().__init__(api_keys, base_url, self.api_model_name)
 
@@ -95,13 +97,12 @@ class Silicon(FlowOCR):
                         ]
                     }
                 ],
-                stream=True,  # 启用流式传输
+                stream=False,
+                temperature=0,
+                max_tokens=2048
             )
-            # 遍历异步迭代器，获取流式响应
-            async for chunk in response:
-                chunk_message = chunk.choices[0].delta.content
-                if chunk_message:
-                    text += str(chunk_message)
+            if response.choices:
+                text = response.choices[0].message.content or ""
             return text
         except Exception as e:
             print(f"API 请求或处理过程中发生错误: {e}")

@@ -65,7 +65,7 @@ async def layout_prediction(input_path: str, bool_ocr = True, task_id = None) ->
 
 
 async def ocr_test(data: List[List[Dict[str, Any]]],
-                   max_concurrent_tasks: int = 10,
+                   max_concurrent_tasks: int = 30,
                    task_id=None, progress_callback=None):  # 新增参数
 
     ocr_tasks = []
@@ -77,7 +77,14 @@ async def ocr_test(data: List[List[Dict[str, Any]]],
     async def run_ocr_task(image, i_idx, j_idx, inf: BlockType = None):
         nonlocal completed_count, total_tasks
         async with semaphore:
-            text = await model_manager.ocr_recognizer.predict(image, inf)
+            text = ""
+            try:
+                text = await asyncio.wait_for(
+                    model_manager.ocr_recognizer.predict(image, inf),
+                    timeout=60
+                )
+            except Exception:
+                text = ""
             completed_count += 1
             # 当任务完成时，调用回调函数
             if progress_callback:
