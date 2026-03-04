@@ -18,7 +18,11 @@ gpt-api:
   api_name: Siliconflow
   base_url: https://api.siliconflow.cn/v1
   model_name: Pro/Qwen/Qwen2.5-VL-7B-Instruct # Pro/Qwen/Qwen2.5-VL-7B-Instruct ； Qwen/Qwen2.5-VL-72B-Instruct
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> b8246957c07ba4021f5e99116672e3c0ca51a880
 chat-api:
   api_key: [ "sk-cxroo*****" ]
   api_name: Siliconflow
