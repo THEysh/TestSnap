@@ -10,6 +10,7 @@ Responsible for:
 from srcProject.config.settings import LAYOUT_MODEL_NAME, LAYOUT_WEIGHTS_PATH, READ_MODEL_NAME, READ_WEIGHTS_PATH, \
     FLOW_API_NAME, FLOW_API_KEY, FLOW_URL, DEVICE, FLOW_USE_MODEL_NAME, \
     CHAT_API_NAME, CHAT_API_KEY, CHAT_URL, CHAT_MODEL_NAME
+from srcProject.models.google_api import Google
 from srcProject.models.layout_detector import DocLayoutYOLO
 from srcProject.models.layout_reader import LayoutReader
 from srcProject.models.model_base import BaseModel
@@ -35,6 +36,8 @@ class ModelFactory:
             return Silicon(api_keys=api_key, base_url=base_url, model_name=model_name)
         elif api_name.lower() == 'siliconflow_chat':
             return SiliconChatModel(api_keys=api_key, base_url=base_url, model_name=model_name, device='api')
+        elif api_name.lower() == 'google':
+            return Google(api_keys=api_key, model_name=model_name)
         else:
             raise ValueError(f"不支持的模型名称: {model_name}")
 
@@ -135,4 +138,7 @@ class ModelManager:
         print(f"已加载Chat-api模型: {api_name},当前激活: {model_name}")
         return True
 if __name__ == '__main__':
-    pass
+    # 获取当前脚本所在的目录
+    ModelManager(device='cpu').change_ocr_recognizer(model_name="models/gemma-3-27b-it",
+                               api_name="google",
+                               api_key="AIzaSyBNYS4c1SRY7aWdoK-jTqlHaH7ApgAtc9g")

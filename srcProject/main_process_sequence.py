@@ -88,7 +88,11 @@ async def ocr_test(data: List[List[Dict[str, Any]]],
                     model_manager.ocr_recognizer.predict(image, inf),
                     timeout=60
                 )
-            except Exception:
+            except asyncio.TimeoutError:
+                print(f"OCR task timed out for block {i_idx}-{j_idx}")
+                text = ""
+            except Exception as e:
+                print(f"OCR task failed for block {i_idx}-{j_idx}: {e}")
                 text = ""
             chunk = format_stream_content(inf, text)
             if stream_callback and chunk:
@@ -97,7 +101,6 @@ async def ocr_test(data: List[List[Dict[str, Any]]],
             # 当任务完成时，调用回调函数
             if progress_callback:
                 await progress_callback(task_id, completed_count, total_tasks)
-
             return text, i_idx, j_idx
 
     for i in range(len(data)):

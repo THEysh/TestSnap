@@ -6,6 +6,10 @@ flask_react/testsnap-react/dist-ssr
 *.local
 configs.yaml
 configs_github.yaml
+configs副本.yaml
 .env
 __pycache__/
+.pytest_cache/
+.idea/
 *.pyc
+

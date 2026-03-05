@@ -83,12 +83,15 @@ function enhanceBlocks(root) {
         html: node.innerHTML
       };
       enqueueBlock(payload);
-      const url = (typeof window !== 'undefined')
-        ? (window.location.origin + window.location.pathname + '#/chat?new=1')
-        : '#/chat?new=1';
-      const w = window.open(url, 'TextSnapChat');
-      if (!w) {
+      const isSameApp = typeof window !== 'undefined' && window.location.pathname.endsWith('/'); 
+      if (isSameApp && window.location.hash.startsWith('#/')) {
+        // 如果是在当前 SPA 应用内，直接修改 hash 跳转，不打开新窗口
         window.location.hash = '#/chat?new=1';
+      } else {
+        const url = (typeof window !== 'undefined')
+          ? (window.location.origin + window.location.pathname + '#/chat?new=1')
+          : '#/chat?new=1';
+        window.open(url, 'TextSnapChat');
       }
       e.stopPropagation();
     });

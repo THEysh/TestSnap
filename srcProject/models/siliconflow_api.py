@@ -84,7 +84,7 @@ class Silicon(FlowOCR):
                             {
                                 "type": "image_url",
                                 "image_url": {
-                                    "url": f"data:image/jpeg;base64,{base64_image}",
+                                    "url": f"data:image/png;base64,{base64_image}",
                                     "detail": "auto"
                                 }
                             },
@@ -107,8 +107,7 @@ class Silicon(FlowOCR):
                 requests.post,
                 url,
                 json=payload,
-                headers=headers,
-                timeout=60
+                headers=headers
             )
             if response.status_code >= 400:
                 self._set_key_index(key_index)

@@ -4,26 +4,45 @@ const CONV_KEY = 'textsnap_chat_conversations';
 const TARGET_KEY = 'textsnap_chat_target';
 
 export function enqueueBlock(payload) {
-  try {
-    const list = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
-    const targetConvId = localStorage.getItem(TARGET_KEY) || null;
-    list.push({
-      id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
-      convId: targetConvId,
-      ...payload,
-      createdAt: Date.now(),
-    });
-    localStorage.setItem(QUEUE_KEY, JSON.stringify(list));
-    window.dispatchEvent(new CustomEvent('textsnap_chat_queue_updated'));
-  } catch (_) {
-    // ignore
-  }
+  const list = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
+  const targetConvId = localStorage.getItem(TARGET_KEY) || null;
+  list.push({
+    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+    convId: targetConvId,
+    ...payload,
+    createdAt: Date.now(),
+  });
+  const newValue = JSON.stringify(list);
+  localStorage.setItem(QUEUE_KEY, newValue);
+  
+  // 必须手动触发 storage 事件，因为同窗口（同源同页）下 setItem 不会触发 window.onstorage
+  window.dispatchEvent(new StorageEvent('storage', {
+    key: QUEUE_KEY,
+    newValue: newValue,
+    url: window.location.href,
+    storageArea: localStorage
+  }));
 }
+
+let memQueue = null;
+let memTimer = null;
 
 export function consumeQueue() {
   const list = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
-  localStorage.removeItem(QUEUE_KEY);
-  return list;
+  if (list && list.length > 0) {
+    localStorage.removeItem(QUEUE_KEY);
+    // 为了应对 React StrictMode 下 useEffect 执行两次的问题，
+    // 我们将取出的数据暂存在内存中一小段时间
+    memQueue = list;
+    if (memTimer) clearTimeout(memTimer);
+    memTimer = setTimeout(() => { memQueue = null; }, 500);
+    return list;
+  }
+  // 如果 localStorage 为空，尝试返回内存中的暂存数据
+  if (memQueue) {
+    return memQueue;
+  }
+  return [];
 }
 
 export function getConversations() {

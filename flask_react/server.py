@@ -14,9 +14,9 @@ from werkzeug.utils import secure_filename
 import uuid
 import nest_asyncio
 import asyncio
-from srcProject.main_process_sequence import main, model_manager
+from srcProject.main_process_sequence import main, ModelManager
 
-serve_model_manager = model_manager
+serve_model_manager = ModelManager()
 nest_asyncio.apply()
 app = Flask(__name__)
 
@@ -146,7 +146,6 @@ def stream_ocr(task_id):
     resp.headers['Connection'] = 'keep-alive'
     resp.headers['X-Accel-Buffering'] = 'no'
     return resp
-
 
 @app.route('/api/markdown', methods=['POST'])
 def get_markdown():
@@ -432,13 +431,11 @@ def process_file_async(filename, file_type):
         # 在新线程中处理文件
         def process_worker():
             try:
-                update_task_progress(task_id, 1, 'processing', f'正在处理{file_type}文件...')
-
                 ctx = multiprocessing.get_context("spawn")
                 result_queue = ctx.Queue()
                 process = ctx.Process(
                     target=process_pdf_image_subprocess,
-                    args=(file_path, result_queue)
+                    args=(file_path, result_queue, task_id)
                 )
                 process.daemon = True
                 process.start()
@@ -514,9 +511,9 @@ def view_file(filename, file_type):
         return None, {'success': False, 'error': f'文件访问错误: {str(e)}'}
 
 
-def process_pdf_image_subprocess(file_path, result_queue):
+def process_pdf_image_subprocess(file_path, result_queue, task_id):
     try:
-        result, result_directory = process_pdf_image(file_path, task_id=None, schedule_cleanup=False, return_directory=True)
+        result, result_directory = process_pdf_image(file_path, task_id=task_id, schedule_cleanup=False, return_directory=True)
         result_queue.put({
             'success': True,
             'result': result,
@@ -536,7 +533,6 @@ def process_pdf_image(file_path, task_id=None, schedule_cleanup=True, return_dir
     :param task_id: 任务ID（可选，用于进度更新）
     """
     loop = None
-    result_directory = None
     try:
         # 更新进度：调用主处理函数
         if task_id:
@@ -684,7 +680,6 @@ def upload_pdf():
     result = upload_file(request.files['file'], 'pdf')
     status_code = 200 if result['success'] else 400 if 'error' in result and '未选择文件' in result['error'] else 500
     return jsonify(result), status_code
-
 
 @app.route('/api/pdf/process', methods=['POST'])
 def process_uploaded_pdf():

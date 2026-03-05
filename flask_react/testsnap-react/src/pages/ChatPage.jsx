@@ -335,33 +335,25 @@ export default function ChatPage() {
 
   // 监听其它页面追加的队列项，追加到当前聊天窗口的附件中
   useEffect(() => {
-    const appendQueued = () => {
-      const items = consumeQueue();
-      if (!items || items.length === 0) return;
-      if (!activeId) {
-        const conv = createConversation({ title: '新对话' });
-        setConvs(getConversations());
-        setActiveId(conv.id);
-        setTargetConversation(conv.id);
-        setAttachments((prev) => prev.concat(items));
-        return;
-      }
-      const forMe = items.filter((it) => !it.convId || it.convId === activeId);
-      const accept = forMe.length > 0 ? forMe : items;
-      setAttachments((prev) => prev.concat(accept));
-    };
     const onStorage = (e) => {
       if (e.key === 'textsnap_chat_queue') {
-        appendQueued();
+        const items = consumeQueue();
+        if (!items || items.length === 0) return;
+        if (!activeId) {
+          const conv = createConversation({ title: '新对话' });
+          setConvs(getConversations());
+          setActiveId(conv.id);
+          setTargetConversation(conv.id);
+          setAttachments((prev) => prev.concat(items));
+          return;
+        }
+        const forMe = items.filter((it) => !it.convId || it.convId === activeId);
+        const accept = forMe.length > 0 ? forMe : items;
+        setAttachments((prev) => prev.concat(accept));
       }
     };
-    const onLocalQueue = () => appendQueued();
     window.addEventListener('storage', onStorage);
-    window.addEventListener('textsnap_chat_queue_updated', onLocalQueue);
-    return () => {
-      window.removeEventListener('storage', onStorage);
-      window.removeEventListener('textsnap_chat_queue_updated', onLocalQueue);
-    };
+    return () => window.removeEventListener('storage', onStorage);
   }, [activeId]);
 
   const activeConv = useMemo(() => convs.find((c) => c.id === activeId) || null, [convs, activeId]);
