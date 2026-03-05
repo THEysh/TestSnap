@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { MessageSquare, Plus, Paperclip, Image as ImageIcon, FileText, Table } from 'lucide-react';
+import { MessageSquare, Plus, Paperclip, Image as ImageIcon, FileText, Table, Square } from 'lucide-react';
 import './ChatPage.css';
 import '../components/MarkdownViewer.css';
 import { getConversations, createConversation, consumeQueue, addMessage, setTargetConversation, deleteConversation, updateLastAssistantMessage, updateLastAssistantReasoning } from '../utils/chatStorage';
@@ -67,6 +67,9 @@ export default function ChatPage() {
   const [preview, setPreview] = useState({ open: false, data: null });
   const previewContentRef = useRef(null);
   const [sending, setSending] = useState(false);
+  const streamAbortRef = useRef(null);
+  const streamingConvIdRef = useRef(null);
+  const streamingRequestIdRef = useRef(null);
   const [copiedId, setCopiedId] = useState(null);
   const [siderWidth, setSiderWidth] = useState(300);
   const resizeRef = useRef({ dragging: false, startX: 0, startWidth: 300 });
@@ -181,7 +184,7 @@ export default function ChatPage() {
     return { success: false, error: '未知错误' };
   };
 
-  const streamChatAPI = async (payload, onChunk) => {
+  const streamChatAPI = async (payload, onChunk, signal) => {
     const endpoints = ['/api/chat/stream'];
     if (typeof window !== 'undefined') {
       endpoints.push('http://localhost:7861/api/chat/stream');
@@ -197,6 +200,7 @@ export default function ChatPage() {
             'Cache-Control': 'no-cache',
           },
           body: JSON.stringify(payload),
+          signal,
         });
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}`);
@@ -245,18 +249,24 @@ export default function ChatPage() {
           if (onChunk) onChunk(piece);
           return false;
         };
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
+        try {
           while (true) {
-            const { idx, len } = readSep();
-            if (idx === -1) break;
-            const event = buffer.slice(0, idx);
-            buffer = buffer.slice(idx + len);
-            const isDone = handleEvent(event);
-            if (isDone) return { success: true };
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            while (true) {
+              const { idx, len } = readSep();
+              if (idx === -1) break;
+              const event = buffer.slice(0, idx);
+              buffer = buffer.slice(idx + len);
+              const isDone = handleEvent(event);
+              if (isDone) return { success: true };
+            }
           }
+        } finally {
+          try {
+            reader.releaseLock();
+          } catch (_) {}
         }
         return { success: true };
       } catch (e) {
@@ -266,6 +276,54 @@ export default function ChatPage() {
       }
     }
     return { success: false, error: '未知错误' };
+  };
+
+  const cancelChat = async ({ convId, requestId } = {}) => {
+    const payload = {
+      conv_id: convId || null,
+      request_id: requestId || null,
+    };
+    const endpoints = ['/api/chat/cancel'];
+    if (typeof window !== 'undefined') {
+      endpoints.push('http://localhost:7861/api/chat/cancel');
+    }
+    for (let i = 0; i < endpoints.length; i++) {
+      const url = endpoints[i];
+      try {
+        await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        return;
+      } catch (_) {
+        if (i === endpoints.length - 1) return;
+      }
+    }
+  };
+
+  const stopGenerating = (convId) => {
+    const activeStreamConv = streamingConvIdRef.current;
+    const activeReqId = streamingRequestIdRef.current;
+    if (!activeStreamConv) return;
+    if (convId && convId !== activeStreamConv) return;
+    try {
+      streamAbortRef.current?.abort();
+    } catch (_) {}
+    cancelChat({ convId: activeStreamConv, requestId: activeReqId });
+    const conv = (getConversations().find(c => c.id === activeStreamConv) || { messages: [] });
+    const msgs = conv.messages || [];
+    const last = msgs.length ? msgs[msgs.length - 1] : null;
+    const lastIsEmptyAssistant =
+      last && last.role === 'assistant' && !(last.content || '').trim() && !(last.meta?.reasoning || '').trim();
+    if (lastIsEmptyAssistant) {
+      updateLastAssistantMessage(activeStreamConv, '已停止生成。');
+      setConvs(getConversations());
+    }
+    streamingConvIdRef.current = null;
+    streamingRequestIdRef.current = null;
+    streamAbortRef.current = null;
+    setSending(false);
   };
   useEffect(() => {
     if (!canThink && enableReasoning) {
@@ -410,11 +468,18 @@ export default function ChatPage() {
     addMessage(convId, { role: 'assistant', content: '' });
     setConvs(getConversations());
     // 流式优先
+    const requestId = `${convId}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
     const payload = {
       messages,
       model_name: selectedModel,
-      enable_reasoning: enableReasoning && canThink
+      enable_reasoning: enableReasoning && canThink,
+      conv_id: convId,
+      request_id: requestId,
     };
+    const controller = new AbortController();
+    streamAbortRef.current = controller;
+    streamingConvIdRef.current = convId;
+    streamingRequestIdRef.current = requestId;
     streamChatAPI(payload, (piece) => {
       if (typeof piece === 'string') {
         updateLastAssistantMessage(convId, piece);
@@ -428,8 +493,9 @@ export default function ChatPage() {
         }
       }
       setConvs(getConversations());
-    }).then((ret) => {
+    }, controller.signal).then((ret) => {
       if (!ret.success) {
+        if ((ret.error || '').includes('AbortError')) return null;
         return callChatAPI(payload).then(data => {
           const reply = data && data.success ? (data.reply || '') : (data && data.error ? `调用失败：${data.error}` : '调用失败');
           updateLastAssistantMessage(convId, reply);
@@ -439,11 +505,17 @@ export default function ChatPage() {
       }
       return null;
     }).catch(err => {
-      updateLastAssistantMessage(convId, `\n\n[流式失败] ${String(err)}`);
+      const name = err?.name || '';
+      const msg = String(err || '');
+      if (name === 'AbortError' || msg.includes('AbortError')) return;
+      updateLastAssistantMessage(convId, `\n\n[流式失败] ${msg}`);
       setConvs(getConversations());
     }).finally(() => {
       setSending(false);
       setAttachments([]);
+      streamingConvIdRef.current = null;
+      streamingRequestIdRef.current = null;
+      streamAbortRef.current = null;
     });
   };
 
@@ -456,6 +528,7 @@ export default function ChatPage() {
           onSelect={setActiveId}
           onCreate={handleCreate}
           onDelete={(id) => {
+            stopGenerating(id);
             const remained = deleteConversation(id);
             setConvs(remained);
             if (id === activeId) {
@@ -664,9 +737,16 @@ export default function ChatPage() {
               }
             }}
           />
-          <button onClick={handleSend} disabled={sending || (!input.trim() && attachments.length === 0)}>
-            发送
-          </button>
+          {sending ? (
+            <button className="stop-btn" onClick={() => stopGenerating()} title="停止生成">
+              <Square size={16} />
+              <span>停止生成</span>
+            </button>
+          ) : (
+            <button onClick={handleSend} disabled={!input.trim() && attachments.length === 0}>
+              发送
+            </button>
+          )}
         </div>
         {preview.open && (
           <div className="preview-modal" onClick={() => setPreview({ open: false, data: null })}>

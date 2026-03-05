@@ -544,6 +544,23 @@
   align-self: flex-end;
   box-shadow: 0 12px 24px rgba(79,70,229,0.22);
 }
+.composer .stop-btn{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 1px solid rgba(148,163,184,0.35);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.9);
+  color: #0f172a;
+  height: 40px;
+  align-self: center;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.10);
+}
+.composer .stop-btn:hover{
+  background: #fff;
+  border-color: rgba(99,102,241,0.35);
+}
 
 .preview-modal{
   position: fixed;

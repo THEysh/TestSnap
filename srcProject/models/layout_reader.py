@@ -1,7 +1,4 @@
-import os.path
-from abc import ABC, abstractmethod
 import torch
-from PIL import Image, ImageDraw
 from transformers import LayoutLMv3ForTokenClassification
 from srcProject.models.helpers import boxes2inputs, prepare_inputs, parse_logits
 from srcProject.models.model_base import BaseModel

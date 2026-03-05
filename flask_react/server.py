@@ -14,6 +14,7 @@ from werkzeug.utils import secure_filename
 import uuid
 import nest_asyncio
 import asyncio
+import atexit
 from srcProject.models.chat_model import SiliconChatModel
 from srcProject.config.settings import CHAT_API_KEY, CHAT_URL, CHAT_MODEL_NAME
 
@@ -59,11 +60,15 @@ _WORKER_PROCESS = None
 _WORKER_READER_THREAD = None
 _WORKER_GEN = 0
 _WORKER_INFLIGHT = set()
+_SHUTDOWN_EVENT = threading.Event()
 
 def _subprocess_worker_main(in_q, out_q, api_base_url):
     from srcProject.main_process_sequence import main as process_main, get_model_manager as worker_get_model_manager
     while True:
-        job = in_q.get()
+        try:
+            job = in_q.get()
+        except (KeyboardInterrupt, EOFError):
+            break
         if job is None:
             break
         kind = job.get('kind') or 'process'
@@ -256,6 +261,8 @@ def _start_worker_locked():
     _WORKER_READER_THREAD.start()
 
 def _ensure_worker_running():
+    if _SHUTDOWN_EVENT.is_set():
+        return
     with _WORKER_LOCK:
         if _WORKER_PROCESS is not None and _WORKER_PROCESS.is_alive():
             return
@@ -281,9 +288,16 @@ def _handle_worker_crash(dead_proc=None):
     with _WORKER_PENDING_LOCK:
         pending = list(_WORKER_PENDING.items())
         _WORKER_PENDING.clear()
+    err_msg = '处理进程崩溃（0xC0000005），任务已中止'
+    try:
+        exitcode = getattr(dead_proc, 'exitcode', None) if dead_proc is not None else None
+        if exitcode in (-1, 0xC000013A):
+            err_msg = '处理进程被中断，任务已中止'
+    except Exception:
+        pass
     for task_id in inflight:
         try:
-            complete_task(task_id, error='处理进程崩溃（0xC0000005），任务已中止')
+            complete_task(task_id, error=err_msg)
         except Exception:
             pass
         try:
@@ -307,7 +321,7 @@ def _start_worker_monitor():
     _WORKER_MONITOR_STARTED = True
     def _loop():
         last_pid = None
-        while True:
+        while not _SHUTDOWN_EVENT.is_set():
             try:
                 _ensure_worker_running()
                 with _WORKER_LOCK:
@@ -323,8 +337,36 @@ def _start_worker_monitor():
     t.daemon = True
     t.start()
 
+def _shutdown_worker():
+    if _SHUTDOWN_EVENT.is_set():
+        return
+    _SHUTDOWN_EVENT.set()
+    try:
+        with _WORKER_LOCK:
+            in_q = _WORKER_IN_Q
+            proc = _WORKER_PROCESS
+        if in_q is not None:
+            try:
+                in_q.put(None)
+            except Exception:
+                pass
+        if proc is not None and proc.is_alive():
+            proc.join(timeout=2)
+            if proc.is_alive():
+                try:
+                    proc.terminate()
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+atexit.register(_shutdown_worker)
+
 _CHAT_LOCK = threading.Lock()
 _CHAT_MODEL = None
+_CHAT_CANCEL_LOCK = threading.Lock()
+_CHAT_CANCEL_REQUESTS = set()
+_CHAT_CANCEL_CONVS = set()
 
 def _get_chat_model():
     global _CHAT_MODEL
@@ -334,6 +376,28 @@ def _get_chat_model():
         if _CHAT_MODEL is None:
             _CHAT_MODEL = SiliconChatModel(api_keys=CHAT_API_KEY, base_url=CHAT_URL, model_name=CHAT_MODEL_NAME)
     return _CHAT_MODEL
+
+def _mark_chat_cancel(conv_id=None, request_id=None):
+    with _CHAT_CANCEL_LOCK:
+        if request_id:
+            _CHAT_CANCEL_REQUESTS.add(str(request_id))
+        if conv_id:
+            _CHAT_CANCEL_CONVS.add(str(conv_id))
+
+def _is_chat_cancelled(conv_id=None, request_id=None):
+    with _CHAT_CANCEL_LOCK:
+        if request_id and str(request_id) in _CHAT_CANCEL_REQUESTS:
+            return True
+        if conv_id and str(conv_id) in _CHAT_CANCEL_CONVS:
+            return True
+        return False
+
+def _clear_chat_cancel(conv_id=None, request_id=None):
+    with _CHAT_CANCEL_LOCK:
+        if request_id:
+            _CHAT_CANCEL_REQUESTS.discard(str(request_id))
+        if conv_id:
+            _CHAT_CANCEL_CONVS.discard(str(conv_id))
 
 _WORKER_PENDING_LOCK = threading.Lock()
 _WORKER_PENDING = {}
@@ -805,6 +869,8 @@ def api_chat_stream():
             return jsonify({'success': False, 'error': 'messages 不能为空'}), 400
         enable_reasoning = data.get('enable_reasoning', False)
         model_name = data.get('model_name', None)
+        conv_id = data.get('conv_id', None)
+        request_id = data.get('request_id', None)
         def sync_generator():
             try:
                 loop = asyncio.new_event_loop()
@@ -815,6 +881,8 @@ def api_chat_stream():
                 agen = _get_chat_model().achat_stream(messages, enable_reasoning, model_name)
                 try:
                     while True:
+                        if _is_chat_cancelled(conv_id, request_id):
+                            break
                         try:
                             piece = loop.run_until_complete(agen.__anext__())
                         except StopAsyncIteration:
@@ -822,11 +890,21 @@ def api_chat_stream():
                         if isinstance(piece, dict):
                             # 结构化输出 → 转 JSON
                             json_str = json.dumps(piece, ensure_ascii=False)
-                            yield f"data: {json_str}\n\n"
+                            try:
+                                yield f"data: {json_str}\n\n"
+                            except GeneratorExit:
+                                break
+                            except Exception:
+                                break
                         else:
                             # 方案1：发送明确的 error 事件
                             error_msg = "返回的内容无法解析为json"
-                            yield f'event: error\ndata: {json.dumps({"error": error_msg, "detail": str(piece)}, ensure_ascii=False)}\n\n'
+                            try:
+                                yield f'event: error\ndata: {json.dumps({"error": error_msg, "detail": str(piece)}, ensure_ascii=False)}\n\n'
+                            except GeneratorExit:
+                                break
+                            except Exception:
+                                break
                 finally:
                     try:
                         loop.run_until_complete(agen.aclose())
@@ -837,6 +915,7 @@ def api_chat_stream():
                         loop.close()
                     except Exception:
                         pass
+                _clear_chat_cancel(conv_id, request_id)
                 yield "event: done\ndata: [DONE]\n\n"
             except Exception as e:
                 err = str(e).replace("\n", " ")
@@ -849,6 +928,20 @@ def api_chat_stream():
         return resp
     except Exception as e:
         logger.error(f"/api/chat/stream 失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/chat/cancel', methods=['POST'])
+def api_chat_cancel():
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        conv_id = data.get('conv_id', None)
+        request_id = data.get('request_id', None)
+        if not conv_id and not request_id:
+            return jsonify({'success': False, 'error': 'conv_id 或 request_id 不能为空'}), 400
+        _mark_chat_cancel(conv_id, request_id)
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        logger.error(f"/api/chat/cancel 失败: {e}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/pdf/upload', methods=['POST'])
