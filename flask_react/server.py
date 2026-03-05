@@ -14,9 +14,9 @@ from werkzeug.utils import secure_filename
 import uuid
 import nest_asyncio
 import asyncio
-from srcProject.main_process_sequence import main, ModelManager
+from srcProject.models.chat_model import SiliconChatModel
+from srcProject.config.settings import CHAT_API_KEY, CHAT_URL, CHAT_MODEL_NAME
 
-serve_model_manager = ModelManager()
 nest_asyncio.apply()
 app = Flask(__name__)
 
@@ -42,16 +42,273 @@ FILE_TYPE_CONFIG = {
     'pdf': {
         'upload_folder': UPLOAD_FOLDER,
         'allowed_extensions': ALLOWED_EXTENSIONS,
-        'process_func': lambda path, task_id: process_pdf_image(path, task_id),
         'success_message': 'PDF处理完成'
     },
     'image': {
         'upload_folder': IMAGE_UPLOAD_FOLDER,
         'allowed_extensions': ALLOWED_IMAGE_EXTENSIONS,
-        'process_func': lambda path, task_id: process_pdf_image(path, task_id),
         'success_message': '图片处理完成'
     }
 }
+
+_WORKER_LOCK = threading.Lock()
+_WORKER_CTX = None
+_WORKER_IN_Q = None
+_WORKER_OUT_Q = None
+_WORKER_PROCESS = None
+_WORKER_READER_THREAD = None
+_WORKER_GEN = 0
+_WORKER_INFLIGHT = set()
+
+def _subprocess_worker_main(in_q, out_q, api_base_url):
+    from srcProject.main_process_sequence import main as process_main, get_model_manager as worker_get_model_manager
+    while True:
+        job = in_q.get()
+        if job is None:
+            break
+        kind = job.get('kind') or 'process'
+        if kind == 'update_config':
+            command_id = job.get('command_id')
+            payload = job.get('payload') or {}
+            try:
+                mgr = worker_get_model_manager()
+                updated = {}
+                read_model = payload.get('read_model')
+                if read_model:
+                    updated['read_model'] = mgr.change_read_model(model_name=read_model)
+                ocr_api_model = payload.get('ocr_api_model')
+                if isinstance(ocr_api_model, dict):
+                    updated['ocr_api_model'] = mgr.change_ocr_recognizer(
+                        api_name=ocr_api_model.get('api_name', None),
+                        api_key=ocr_api_model.get('api_key', None),
+                        base_url=ocr_api_model.get('base_url', None),
+                        model_name=ocr_api_model.get('model_name', None)
+                    )
+                out_q.put({'type': 'command_result', 'command_id': command_id, 'success': True, 'updated': updated})
+            except Exception as e:
+                out_q.put({'type': 'command_result', 'command_id': command_id, 'success': False, 'error': str(e)})
+            continue
+        task_id = job.get('task_id')
+        file_path = job.get('file_path')
+        file_type = job.get('file_type')
+        try:
+            def progress_update(local_task_id, progress, status='processing', message=None):
+                out_q.put({
+                    'type': 'progress',
+                    'task_id': local_task_id,
+                    'progress': progress,
+                    'status': status,
+                    'message': message
+                })
+            def stream_callback(local_task_id, payload):
+                out_q.put({
+                    'type': 'stream',
+                    'task_id': local_task_id,
+                    'payload': payload
+                })
+            out_q.put({
+                'type': 'status',
+                'task_id': task_id,
+                'status': 'processing',
+                'message': f'正在处理{file_type}文件'
+            })
+            try:
+                md_save_path, visualize_path = asyncio.run(
+                    process_main(file_path, task_id=task_id, stream_callback=stream_callback, stream_api_base_url=api_base_url, progress_update=progress_update)
+                )
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                md_save_path, visualize_path = loop.run_until_complete(
+                    process_main(file_path, task_id=task_id, stream_callback=stream_callback, stream_api_base_url=api_base_url, progress_update=progress_update)
+                )
+                try:
+                    loop.stop()
+                    loop.close()
+                except Exception:
+                    pass
+            if not os.path.isfile(visualize_path):
+                raise RuntimeError('路径不存在，处理失败')
+            visualize_relative_path = to_relative_path(visualize_path)
+            md_relative_path = to_relative_path(md_save_path)
+            try:
+                result_directory = os.path.dirname(visualize_path) or os.path.dirname(md_save_path)
+            except Exception:
+                result_directory = None
+            result = {
+                'success': True,
+                'processed_file': visualize_relative_path,
+                'md_path': md_relative_path,
+                'processing_info': {
+                    'method': '示例处理',
+                    'description': '示例处理',
+                    'file_size': os.path.getsize(visualize_path),
+                    'auto_delete_info': '该文件将在3小时后自动删除'
+                }
+            }
+            out_q.put({
+                'type': 'done',
+                'task_id': task_id,
+                'success': True,
+                'result': result,
+                'result_directory': result_directory
+            })
+        except Exception as e:
+            out_q.put({
+                'type': 'done',
+                'task_id': task_id,
+                'success': False,
+                'error': str(e)
+            })
+
+def _start_worker_locked():
+    global _WORKER_CTX, _WORKER_IN_Q, _WORKER_OUT_Q, _WORKER_PROCESS, _WORKER_READER_THREAD, _WORKER_GEN
+    _WORKER_GEN += 1
+    gen = _WORKER_GEN
+    _WORKER_CTX = multiprocessing.get_context("spawn")
+    _WORKER_IN_Q = _WORKER_CTX.Queue()
+    _WORKER_OUT_Q = _WORKER_CTX.Queue()
+    _WORKER_PROCESS = _WORKER_CTX.Process(
+        target=_subprocess_worker_main,
+        args=(_WORKER_IN_Q, _WORKER_OUT_Q, API_BASE_URL)
+    )
+    _WORKER_PROCESS.daemon = True
+    _WORKER_PROCESS.start()
+
+    def _reader_loop(local_gen):
+        while True:
+            with _WORKER_LOCK:
+                if local_gen != _WORKER_GEN:
+                    return
+                proc = _WORKER_PROCESS
+                out_q = _WORKER_OUT_Q
+            if proc is None or out_q is None:
+                return
+            try:
+                msg = out_q.get(timeout=0.5)
+            except Exception:
+                if proc is not None and not proc.is_alive():
+                    _handle_worker_crash()
+                    return
+                continue
+            try:
+                mtype = msg.get('type')
+                task_id = msg.get('task_id')
+                if mtype == 'stream':
+                    payload = msg.get('payload')
+                    if payload is not None:
+                        push_task_stream(task_id, payload)
+                elif mtype == 'progress':
+                    update_task_progress(task_id, msg.get('progress', 0), msg.get('status', 'processing'), msg.get('message'))
+                elif mtype == 'status':
+                    if task_id in TASK_PROCESS:
+                        TASK_PROCESS[task_id]['status'] = msg.get('status') or TASK_PROCESS[task_id].get('status')
+                        TASK_PROCESS[task_id]['message'] = msg.get('message') or TASK_PROCESS[task_id].get('message')
+                        TASK_PROCESS[task_id]['updated_at'] = time.time()
+                elif mtype == 'done':
+                    success = msg.get('success', False)
+                    if success:
+                        result = msg.get('result') or {}
+                        result_directory = msg.get('result_directory')
+                        if result_directory and os.path.isdir(result_directory):
+                            try:
+                                schedule_directory_deletion(result_directory)
+                            except Exception:
+                                pass
+                        complete_task(task_id, result)
+                    else:
+                        complete_task(task_id, error=msg.get('error') or '处理失败')
+                    try:
+                        close_task_stream(task_id)
+                    except Exception:
+                        pass
+                    with _WORKER_LOCK:
+                        _WORKER_INFLIGHT.discard(task_id)
+                elif mtype == 'command_result':
+                    command_id = msg.get('command_id')
+                    if command_id:
+                        with _WORKER_PENDING_LOCK:
+                            q = _WORKER_PENDING.pop(command_id, None)
+                        if q is not None:
+                            try:
+                                q.put(msg)
+                            except Exception:
+                                pass
+            except Exception:
+                continue
+
+    _WORKER_READER_THREAD = threading.Thread(target=_reader_loop, args=(gen,), name='TextSnapWorkerReader')
+    _WORKER_READER_THREAD.daemon = True
+    _WORKER_READER_THREAD.start()
+
+def _ensure_worker_running():
+    with _WORKER_LOCK:
+        if _WORKER_PROCESS is not None and _WORKER_PROCESS.is_alive():
+            return
+        _start_worker_locked()
+
+def _handle_worker_crash():
+    global _WORKER_PROCESS, _WORKER_IN_Q, _WORKER_OUT_Q, _WORKER_CTX, _WORKER_GEN
+    with _WORKER_LOCK:
+        inflight = list(_WORKER_INFLIGHT)
+        _WORKER_INFLIGHT.clear()
+        _WORKER_PROCESS = None
+        _WORKER_IN_Q = None
+        _WORKER_OUT_Q = None
+        _WORKER_CTX = None
+        _WORKER_GEN += 1
+    with _WORKER_PENDING_LOCK:
+        pending = list(_WORKER_PENDING.items())
+        _WORKER_PENDING.clear()
+    for task_id in inflight:
+        try:
+            complete_task(task_id, error='处理进程崩溃（0xC0000005），任务已中止')
+        except Exception:
+            pass
+        try:
+            close_task_stream(task_id)
+        except Exception:
+            pass
+    for command_id, q in pending:
+        try:
+            q.put({'type': 'command_result', 'command_id': command_id, 'success': False, 'error': 'worker已崩溃'})
+        except Exception:
+            pass
+
+_CHAT_LOCK = threading.Lock()
+_CHAT_MODEL = None
+
+def _get_chat_model():
+    global _CHAT_MODEL
+    if _CHAT_MODEL is not None:
+        return _CHAT_MODEL
+    with _CHAT_LOCK:
+        if _CHAT_MODEL is None:
+            _CHAT_MODEL = SiliconChatModel(api_keys=CHAT_API_KEY, base_url=CHAT_URL, model_name=CHAT_MODEL_NAME)
+    return _CHAT_MODEL
+
+_WORKER_PENDING_LOCK = threading.Lock()
+_WORKER_PENDING = {}
+
+def _send_worker_command(kind, payload, timeout_seconds=20):
+    command_id = uuid.uuid4().hex
+    q = queue.Queue(maxsize=1)
+    with _WORKER_PENDING_LOCK:
+        _WORKER_PENDING[command_id] = q
+    _ensure_worker_running()
+    with _WORKER_LOCK:
+        in_q = _WORKER_IN_Q
+    in_q.put({
+        'kind': kind,
+        'command_id': command_id,
+        'payload': payload
+    })
+    try:
+        return q.get(timeout=timeout_seconds)
+    except Exception:
+        with _WORKER_PENDING_LOCK:
+            _WORKER_PENDING.pop(command_id, None)
+        return {'success': False, 'error': 'worker响应超时', 'command_id': command_id}
 
 
 # 确保上传目录存在
@@ -428,44 +685,19 @@ def process_file_async(filename, file_type):
 
         logger.info(f"创建任务 {task_id}: 处理{file_type}文件 {filename}")
 
-        # 在新线程中处理文件
-        def process_worker():
-            try:
-                ctx = multiprocessing.get_context("spawn")
-                result_queue = ctx.Queue()
-                process = ctx.Process(
-                    target=process_pdf_image_subprocess,
-                    args=(file_path, result_queue, task_id)
-                )
-                process.daemon = True
-                process.start()
-                process.join()
-                if process.exitcode != 0:
-                    complete_task(task_id, error=f'处理进程异常退出: {process.exitcode}')
-                    return
-                try:
-                    payload = result_queue.get_nowait()
-                except Exception:
-                    complete_task(task_id, error='处理进程未返回结果')
-                    return
-                if payload.get('success'):
-                    result = payload.get('result') or {}
-                    result_directory = payload.get('result_directory')
-                    if result_directory and os.path.isdir(result_directory):
-                        schedule_directory_deletion(result_directory)
-                    complete_task(task_id, result)
-                else:
-                    complete_task(task_id, error=payload.get('error') or '处理失败')
+        TASK_PROCESS[task_id]['status'] = 'queued'
+        TASK_PROCESS[task_id]['message'] = f'已进入队列，等待处理{file_type}文件'
+        TASK_PROCESS[task_id]['updated_at'] = time.time()
 
-            except Exception as e:
-                logger.error(f"任务 {task_id} 处理异常: {str(e)}")
-                complete_task(task_id, error=f'处理失败: {str(e)}')
-            finally:
-                close_task_stream(task_id)
-
-        thread = threading.Thread(target=process_worker)
-        thread.daemon = True
-        thread.start()
+        _ensure_worker_running()
+        with _WORKER_LOCK:
+            _WORKER_INFLIGHT.add(task_id)
+            in_q = _WORKER_IN_Q
+        in_q.put({
+            'task_id': task_id,
+            'file_path': file_path,
+            'file_type': file_type
+        })
 
         return {
             'success': True,
@@ -511,103 +743,6 @@ def view_file(filename, file_type):
         return None, {'success': False, 'error': f'文件访问错误: {str(e)}'}
 
 
-def process_pdf_image_subprocess(file_path, result_queue, task_id):
-    try:
-        result, result_directory = process_pdf_image(file_path, task_id=task_id, schedule_cleanup=False, return_directory=True)
-        result_queue.put({
-            'success': True,
-            'result': result,
-            'result_directory': result_directory
-        })
-    except Exception as e:
-        result_queue.put({
-            'success': False,
-            'error': str(e)
-        })
-
-
-def process_pdf_image(file_path, task_id=None, schedule_cleanup=True, return_directory=False):
-    """
-    处理PDF/图片文件
-    :param file_path: 文件路径
-    :param task_id: 任务ID（可选，用于进度更新）
-    """
-    loop = None
-    try:
-        # 更新进度：调用主处理函数
-        if task_id:
-            update_task_progress(task_id, 5, 'processing', '正在执行核心处理...')
-
-        def stream_callback(local_task_id, payload):
-            if local_task_id:
-                push_task_stream(local_task_id, payload)
-        try:
-            md_save_path, visualize_path = asyncio.run(
-                main(file_path, task_id, stream_callback=stream_callback, stream_api_base_url=API_BASE_URL)
-            )
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            md_save_path, visualize_path = loop.run_until_complete(
-                main(file_path, task_id, stream_callback=stream_callback, stream_api_base_url=API_BASE_URL)
-            )
-
-        # 更新进度：处理完成，检查结果
-        if task_id:
-            update_task_progress(task_id, 98, 'processing', '正在返回结果...')
-
-        if not os.path.isfile(visualize_path):
-            return {'success': False, 'error': '路径不存在，处理失败'}
-
-        visualize_relative_path = to_relative_path(visualize_path)
-        md_relative_path = to_relative_path(md_save_path)
-
-        # 获取处理结果目录（假设两个文件在同一个目录下）
-        # 尝试从visualize_path获取目录，如果失败则从md_save_path获取
-        try:
-            result_directory = os.path.dirname(visualize_path)
-            if not result_directory:
-                result_directory = os.path.dirname(md_save_path)
-        except Exception:
-            result_directory = None
-
-        if schedule_cleanup and result_directory and os.path.isdir(result_directory):
-            schedule_directory_deletion(result_directory)
-        result = {
-            'success': True,
-            'processed_file': visualize_relative_path,
-            'md_path': md_relative_path,
-            'processing_info': {
-                'method': '示例处理',
-                'description': '示例处理',
-                'file_size': os.path.getsize(visualize_path),
-                'auto_delete_info': '该文件将在3小时后自动删除'
-            }
-        }
-
-        if return_directory:
-            return result, result_directory
-        return result
-
-    except Exception as e:
-        import traceback
-        error_msg = f"process_pdf_image 异常: {str(e)}"
-        logger.error(f"{error_msg}\n{traceback.format_exc()}")
-        result = {'success': False, 'error': str(e)}
-        if return_directory:
-            return result, None
-        return result
-    finally:
-        if loop:
-            try:
-                loop.stop()
-            except Exception:
-                pass
-            try:
-                loop.close()
-            except Exception:
-                pass
-
 @app.route('/api/chat/stream', methods=['POST'])
 def api_chat_stream():
     """
@@ -627,7 +762,7 @@ def api_chat_stream():
                     asyncio.set_event_loop(loop)
                 except Exception:
                     pass
-                agen = serve_model_manager.chat_model.achat_stream(messages, enable_reasoning, model_name)
+                agen = _get_chat_model().achat_stream(messages, enable_reasoning, model_name)
                 try:
                     while True:
                         try:
@@ -806,48 +941,37 @@ def update_model_config():
         if not isinstance(data, dict):
             return jsonify({"status": "error", "message": "请求体格式不正确，需要一个JSON对象"}), 400
 
-        update_results = {}  # 用于返回详细结果
-
-        # 更新阅读模型
         read_model = data.get('read_model')
-        if read_model:
-            result = serve_model_manager.change_read_model(model_name=read_model)
-            update_results['read_model'] = {
-                "model_name": read_model,
-                "updated": result
-            }
-
-        # 更新 OCR 模型
         ocr_api_model = data.get('ocr_api_model')
-        if ocr_api_model:
-            api_name = ocr_api_model.get('api_name',None)
-            api_key = ocr_api_model.get('api_key',None)
-            base_url = ocr_api_model.get('base_url',None)
-            model_name = ocr_api_model.get('model_name',None)
-
-            if not model_name:
-                return jsonify({
-                    "status": "error",
-                    "message": "ocr_api_model配置缺失关键字段 (model_name)"
-                }), 400
-
-            result = serve_model_manager.change_ocr_recognizer(
-                api_name=api_name,
-                api_key=api_key,
-                base_url=base_url,
-                model_name=model_name
-            )
-            update_results['ocr_api_model'] = {
-                "model_name": model_name,
-                "api_name": api_name,
-                "updated": result
-            }
-
         if not read_model and not ocr_api_model:
             return jsonify({
                 "status": "error",
                 "message": "未提供任何模型配置进行更新"
             }), 400
+
+        if ocr_api_model and (not isinstance(ocr_api_model, dict) or not ocr_api_model.get('model_name')):
+            return jsonify({
+                "status": "error",
+                "message": "ocr_api_model配置缺失关键字段 (model_name)"
+            }), 400
+
+        resp = _send_worker_command('update_config', {'read_model': read_model, 'ocr_api_model': ocr_api_model})
+        if not resp or not resp.get('success'):
+            return jsonify({
+                "status": "error",
+                "message": f"模型配置更新失败: {resp.get('error') if isinstance(resp, dict) else '未知错误'}"
+            }), 500
+
+        updated = resp.get('updated') or {}
+        update_results = {}
+        if read_model:
+            update_results['read_model'] = {"model_name": read_model, "updated": updated.get('read_model', False)}
+        if ocr_api_model:
+            update_results['ocr_api_model'] = {
+                "model_name": ocr_api_model.get('model_name'),
+                "api_name": ocr_api_model.get('api_name'),
+                "updated": updated.get('ocr_api_model', False)
+            }
 
         return jsonify({
             "status": "success",

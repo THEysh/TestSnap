@@ -1,4 +1,5 @@
 import asyncio
+import threading
 from PIL import Image
 from typing import List, Dict, Any
 from tqdm.asyncio import tqdm_asyncio
@@ -13,14 +14,27 @@ from srcProject.utlis.visualization.visualize_document import visualize_document
 import os
 
 
-model_manager = ModelManager()
+_MODEL_MANAGER = None
+_MODEL_MANAGER_LOCK = threading.Lock()
 
-async def layout_prediction(input_path: str, bool_ocr = True, task_id = None, stream_callback=None, stream_image_dir=None, stream_api_base_url=None) -> List[List[Dict[str, Any]]]:
+def get_model_manager() -> ModelManager:
+    global _MODEL_MANAGER
+    if _MODEL_MANAGER is not None:
+        return _MODEL_MANAGER
+    with _MODEL_MANAGER_LOCK:
+        if _MODEL_MANAGER is None:
+            _MODEL_MANAGER = ModelManager()
+    return _MODEL_MANAGER
+
+async def layout_prediction(input_path: str, bool_ocr = True, task_id = None, stream_callback=None, stream_image_dir=None, stream_api_base_url=None, progress_update=None) -> List[List[Dict[str, Any]]]:
     """
     处理单个文档，执行布局分析、文本提取和结构化，并进行可视化。
     """
     if task_id:
-        update_task_progress(task_id, 5, 'processing', '正在进行布局识别....')
+        if progress_update:
+            progress_update(task_id, 5, 'processing', '正在进行布局识别....')
+        else:
+            update_task_progress(task_id, 5, 'processing', '正在进行布局识别....')
     file_extension = os.path.splitext(input_path)[1].lower()
     all_page_images = []
     if file_extension == '.pdf':
@@ -35,6 +49,7 @@ async def layout_prediction(input_path: str, bool_ocr = True, task_id = None, st
     else:
         raise ValueError(f"不支持的文件类型: {file_extension}")
     print(f"开始对 {len(all_page_images)} 页进行布局预测...")
+    model_manager = get_model_manager()
     detections_per_page = model_manager.layout_detector.batch_predict(
         images=all_page_images,
         batch_size=4  # 根据你的GPU显存和图片大小调整批处理大小
@@ -53,15 +68,23 @@ async def layout_prediction(input_path: str, bool_ocr = True, task_id = None, st
                     detections_per_page[i][j]['cropped_image'] = cropped_image
     print("布局预测完成。")
     if task_id:
-        update_task_progress(task_id, 10, 'processing', '布局识别....完成')
+        if progress_update:
+            progress_update(task_id, 10, 'processing', '布局识别....完成')
+        else:
+            update_task_progress(task_id, 10, 'processing', '布局识别....完成')
     filtered_detections = batch_preprocess_detections(detections_per_page, iou_threshold=0.05)
     print("布局预测iou过滤完成")
     # 调用异步OCR函数
     if bool_ocr:
+        async def _progress_cb(local_task_id, completed_count, total_tasks):
+            if not progress_update:
+                return await handle_progress(local_task_id, completed_count, total_tasks)
+            process = 10 + (completed_count / total_tasks) * 100 * 0.8 if total_tasks else 10
+            progress_update(local_task_id, round(process, 2), 'processing', f'OCR处理中...{completed_count}/{total_tasks}')
         filtered_detections = await ocr_test(
             data=filtered_detections,
             task_id=task_id,
-            progress_callback=handle_progress,
+            progress_callback=_progress_cb,
             stream_callback=stream_callback,
             stream_image_dir=stream_image_dir,
             stream_api_base_url=stream_api_base_url
@@ -75,6 +98,7 @@ async def ocr_test(data: List[List[Dict[str, Any]]],
 
     ocr_tasks = []
     semaphore = asyncio.Semaphore(max_concurrent_tasks)
+    model_manager = get_model_manager()
 
     # 在 ocr_test 内部定义一个计数器，供回调函数使用
     completed_count = 0
@@ -169,16 +193,20 @@ def save_stream_image(cropped_image: Image.Image, stream_image_dir: str, page_in
     return relative_path
 
 
-def read_prediction(data:List[List[Dict[str, Any]]], task_id = None)->List[List[int]]:
+def read_prediction(data:List[List[Dict[str, Any]]], task_id = None, progress_update=None)->List[List[int]]:
     if task_id:
-        update_task_progress(task_id, 92, 'processing', '正在计算阅读顺序...')
+        if progress_update:
+            progress_update(task_id, 92, 'processing', '正在计算阅读顺序...')
+        else:
+            update_task_progress(task_id, 92, 'processing', '正在计算阅读顺序...')
+    model_manager = get_model_manager()
     page_order = model_manager.read_model.batch_predict(data)
     order_in_list = find_reading_order_index(page_order)
     print(f'阅读顺序索引{order_in_list}')
     return order_in_list
 
 def generate_markdown_document(data: List[List[Dict[str, Any]]], reading_order: List[List[int]],
-                               output_path: str, task_id = None) -> str:
+                               output_path: str, task_id = None, progress_update=None) -> str:
     """
     根据 OCR 结果和阅读顺序生成 Markdown 文档并保存。
     Args:
@@ -188,7 +216,10 @@ def generate_markdown_document(data: List[List[Dict[str, Any]]], reading_order: 
     """
     # 检查并创建保存路径的父目录
     if task_id:
-        update_task_progress(task_id, 95, 'processing', '正在生成md文档...')
+        if progress_update:
+            progress_update(task_id, 95, 'processing', '正在生成md文档...')
+        else:
+            update_task_progress(task_id, 95, 'processing', '正在生成md文档...')
     save_root_path = os.path.dirname(output_path)
     images_path = os.path.join(save_root_path, "images")
     prepare_directory(save_root_path)
@@ -233,7 +264,7 @@ def generate_markdown_document(data: List[List[Dict[str, Any]]], reading_order: 
     print(f"Markdown文档已生成并保存到: {output_path}")
     return final_markdown
 
-async def main(path, task_id=None, stream_callback=None, stream_api_base_url=None):
+async def main(path, task_id=None, stream_callback=None, stream_api_base_url=None, progress_update=None):
     sample_path = os.path.join(find_project_root(), path)
     file_name_without_extension, file_extension = os.path.splitext(os.path.basename(sample_path))
     stream_image_dir = os.path.join(
@@ -248,10 +279,12 @@ async def main(path, task_id=None, stream_callback=None, stream_api_base_url=Non
         task_id=task_id,
         stream_callback=stream_callback,
         stream_image_dir=stream_image_dir,
-        stream_api_base_url=stream_api_base_url
+        stream_api_base_url=stream_api_base_url,
+        progress_update=progress_update
     )
-    page_order = read_prediction(detections, task_id=task_id)
+    page_order = read_prediction(detections, task_id=task_id, progress_update=progress_update)
 
+    model_manager = get_model_manager()
     visualize_path = visualize_document(
         input_path=sample_path,  # 传入原始输入路径
         detections_per_page=detections,
@@ -263,12 +296,11 @@ async def main(path, task_id=None, stream_callback=None, stream_api_base_url=Non
     md_save_path = os.path.join(find_project_root(),
                                 f"srcProject/output/visualizations/{file_name_without_extension}",
                                 f"{file_name_without_extension}.md")
-    generate_markdown_document(detections, page_order, output_path=md_save_path)
+    generate_markdown_document(detections, page_order, output_path=md_save_path, task_id=task_id, progress_update=progress_update)
     return md_save_path, visualize_path
 
 
 if __name__ == '__main__':
-    model_manager = ModelManager()
     asyncio.run(main('tests/test_data/demo1_页面_3.png'))
 
 
