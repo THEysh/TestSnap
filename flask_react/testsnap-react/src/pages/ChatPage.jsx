@@ -335,25 +335,43 @@ export default function ChatPage() {
 
   // 监听其它页面追加的队列项，追加到当前聊天窗口的附件中
   useEffect(() => {
-    const onStorage = (e) => {
-      if (e.key === 'textsnap_chat_queue') {
-        const items = consumeQueue();
-        if (!items || items.length === 0) return;
-        if (!activeId) {
-          const conv = createConversation({ title: '新对话' });
-          setConvs(getConversations());
-          setActiveId(conv.id);
-          setTargetConversation(conv.id);
-          setAttachments((prev) => prev.concat(items));
-          return;
-        }
-        const forMe = items.filter((it) => !it.convId || it.convId === activeId);
-        const accept = forMe.length > 0 ? forMe : items;
-        setAttachments((prev) => prev.concat(accept));
+    const pull = () => {
+      const items = consumeQueue();
+      if (!items || items.length === 0) return;
+      if (!activeId) {
+        const conv = createConversation({ title: '新的上下文对话' });
+        setConvs(getConversations());
+        setActiveId(conv.id);
+        setTargetConversation(conv.id);
+        setAttachments((prev) => prev.concat(items));
+        return;
       }
+      const forMe = items.filter((it) => !it.convId || it.convId === activeId);
+      const accept = forMe.length > 0 ? forMe : items;
+      setAttachments((prev) => prev.concat(accept));
     };
+    const onStorage = (e) => {
+      if (e.key === 'textsnap_chat_queue') pull();
+    };
+    const onQueueUpdated = () => pull();
+    const onFocus = () => pull();
+    const onHashChange = () => pull();
+    const onVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') pull();
+    };
+    pull();
     window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    window.addEventListener('textsnap_chat_queue_updated', onQueueUpdated);
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('hashchange', onHashChange);
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('textsnap_chat_queue_updated', onQueueUpdated);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('hashchange', onHashChange);
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [activeId]);
 
   const activeConv = useMemo(() => convs.find((c) => c.id === activeId) || null, [convs, activeId]);
