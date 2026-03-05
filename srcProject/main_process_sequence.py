@@ -13,7 +13,6 @@ from srcProject.utlis.common import find_project_root, prepare_directory
 from srcProject.utlis.visualization.visualize_document import visualize_document
 import os
 
-
 _MODEL_MANAGER = None
 _MODEL_MANAGER_LOCK = threading.Lock()
 

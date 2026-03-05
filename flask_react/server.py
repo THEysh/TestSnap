@@ -67,6 +67,20 @@ def _subprocess_worker_main(in_q, out_q, api_base_url):
         if job is None:
             break
         kind = job.get('kind') or 'process'
+        if kind == 'warmup':
+            command_id = job.get('command_id')
+            try:
+                mgr = worker_get_model_manager()
+                out_q.put({
+                    'type': 'command_result',
+                    'command_id': command_id,
+                    'success': True,
+                    'pid': os.getpid(),
+                    'device': getattr(mgr, 'device', None)
+                })
+            except Exception as e:
+                out_q.put({'type': 'command_result', 'command_id': command_id, 'success': False, 'error': str(e)})
+            continue
         if kind == 'update_config':
             command_id = job.get('command_id')
             payload = job.get('payload') or {}
@@ -188,7 +202,7 @@ def _start_worker_locked():
                 msg = out_q.get(timeout=0.5)
             except Exception:
                 if proc is not None and not proc.is_alive():
-                    _handle_worker_crash()
+                    _handle_worker_crash(proc)
                     return
                 continue
             try:
@@ -247,8 +261,15 @@ def _ensure_worker_running():
             return
         _start_worker_locked()
 
-def _handle_worker_crash():
+def _handle_worker_crash(dead_proc=None):
     global _WORKER_PROCESS, _WORKER_IN_Q, _WORKER_OUT_Q, _WORKER_CTX, _WORKER_GEN
+    try:
+        if dead_proc is not None:
+            logger.error(f"处理进程退出: pid={getattr(dead_proc, 'pid', None)}, exitcode={getattr(dead_proc, 'exitcode', None)}")
+        else:
+            logger.error("处理进程退出")
+    except Exception:
+        pass
     with _WORKER_LOCK:
         inflight = list(_WORKER_INFLIGHT)
         _WORKER_INFLIGHT.clear()
@@ -274,6 +295,33 @@ def _handle_worker_crash():
             q.put({'type': 'command_result', 'command_id': command_id, 'success': False, 'error': 'worker已崩溃'})
         except Exception:
             pass
+
+_WORKER_MONITOR_STARTED = False
+
+def _start_worker_monitor():
+    global _WORKER_MONITOR_STARTED
+    if _WORKER_MONITOR_STARTED:
+        return
+    if multiprocessing.current_process().name != 'MainProcess':
+        return
+    _WORKER_MONITOR_STARTED = True
+    def _loop():
+        last_pid = None
+        while True:
+            try:
+                _ensure_worker_running()
+                with _WORKER_LOCK:
+                    proc = _WORKER_PROCESS
+                    pid = proc.pid if proc is not None else None
+                if pid and pid != last_pid:
+                    _send_worker_command('warmup', {}, timeout_seconds=600)
+                    last_pid = pid
+            except Exception:
+                pass
+            time.sleep(2)
+    t = threading.Thread(target=_loop, name='TextSnapWorkerMonitor')
+    t.daemon = True
+    t.start()
 
 _CHAT_LOCK = threading.Lock()
 _CHAT_MODEL = None
@@ -317,6 +365,8 @@ os.makedirs(IMAGE_UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['IMAGE_UPLOAD_FOLDER'] = IMAGE_UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
+
+_start_worker_monitor()
 
 @app.route('/api/task/progress/<task_id>', methods=['GET'])
 def get_task_progress(task_id):
