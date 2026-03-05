@@ -7,6 +7,7 @@ import os
 import mimetypes
 import shutil
 import threading
+import multiprocessing
 import time
 from srcProject.utlis.common import find_project_root, to_relative_path
 from werkzeug.utils import secure_filename
@@ -152,6 +153,7 @@ def get_markdown():
     """
     接收Markdown文件路径，返回文件内容
     """
+    print("开始 '/api/markdown' ")
     try:
         data = request.get_json()
 
@@ -217,7 +219,7 @@ def get_markdown():
 
         # 获取文件的目录路径，用于图片路径处理
         file_dir = os.path.dirname(file_path)
-
+        print("结束 '/api/markdown' ")
         return jsonify({
             'success': True,
             'content': content,
@@ -238,6 +240,7 @@ def serve_file(filename):
     """
     静态文件服务接口，用于提供图片等资源文件
     """
+    print("开始 /api/files/")
     try:
         # 构建完整的文件路径
         full_path = os.path.join(project_root, filename)
@@ -263,6 +266,7 @@ def serve_file(filename):
         file_name = os.path.basename(full_path)
 
         # 使用send_from_directory安全地提供文件
+        print("结束 /api/files/")
         return send_from_directory(directory, file_name)
 
     except Exception as e:
@@ -430,13 +434,31 @@ def process_file_async(filename, file_type):
             try:
                 update_task_progress(task_id, 1, 'processing', f'正在处理{file_type}文件...')
 
-                # 调用处理函数
-                result = config['process_func'](file_path, task_id)
-
-                if result['success']:
+                ctx = multiprocessing.get_context("spawn")
+                result_queue = ctx.Queue()
+                process = ctx.Process(
+                    target=process_pdf_image_subprocess,
+                    args=(file_path, result_queue)
+                )
+                process.daemon = True
+                process.start()
+                process.join()
+                if process.exitcode != 0:
+                    complete_task(task_id, error=f'处理进程异常退出: {process.exitcode}')
+                    return
+                try:
+                    payload = result_queue.get_nowait()
+                except Exception:
+                    complete_task(task_id, error='处理进程未返回结果')
+                    return
+                if payload.get('success'):
+                    result = payload.get('result') or {}
+                    result_directory = payload.get('result_directory')
+                    if result_directory and os.path.isdir(result_directory):
+                        schedule_directory_deletion(result_directory)
                     complete_task(task_id, result)
                 else:
-                    complete_task(task_id, error=result['error'])
+                    complete_task(task_id, error=payload.get('error') or '处理失败')
 
             except Exception as e:
                 logger.error(f"任务 {task_id} 处理异常: {str(e)}")
@@ -492,14 +514,30 @@ def view_file(filename, file_type):
         return None, {'success': False, 'error': f'文件访问错误: {str(e)}'}
 
 
-def process_pdf_image(file_path, task_id=None):
+def process_pdf_image_subprocess(file_path, result_queue):
+    try:
+        result, result_directory = process_pdf_image(file_path, task_id=None, schedule_cleanup=False, return_directory=True)
+        result_queue.put({
+            'success': True,
+            'result': result,
+            'result_directory': result_directory
+        })
+    except Exception as e:
+        result_queue.put({
+            'success': False,
+            'error': str(e)
+        })
+
+
+def process_pdf_image(file_path, task_id=None, schedule_cleanup=True, return_directory=False):
     """
     处理PDF/图片文件
     :param file_path: 文件路径
     :param task_id: 任务ID（可选，用于进度更新）
     """
+    loop = None
+    result_directory = None
     try:
-        loop = asyncio.get_event_loop()  # 获取当前 event loop
         # 更新进度：调用主处理函数
         if task_id:
             update_task_progress(task_id, 5, 'processing', '正在执行核心处理...')
@@ -507,9 +545,16 @@ def process_pdf_image(file_path, task_id=None):
         def stream_callback(local_task_id, payload):
             if local_task_id:
                 push_task_stream(local_task_id, payload)
-        md_save_path, visualize_path = loop.run_until_complete(
-            main(file_path, task_id, stream_callback=stream_callback, stream_api_base_url=API_BASE_URL)
-        )
+        try:
+            md_save_path, visualize_path = asyncio.run(
+                main(file_path, task_id, stream_callback=stream_callback, stream_api_base_url=API_BASE_URL)
+            )
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            md_save_path, visualize_path = loop.run_until_complete(
+                main(file_path, task_id, stream_callback=stream_callback, stream_api_base_url=API_BASE_URL)
+            )
 
         # 更新进度：处理完成，检查结果
         if task_id:
@@ -530,8 +575,7 @@ def process_pdf_image(file_path, task_id=None):
         except Exception:
             result_directory = None
 
-        # 如果找到目录，安排删除
-        if result_directory and os.path.isdir(result_directory):
+        if schedule_cleanup and result_directory and os.path.isdir(result_directory):
             schedule_directory_deletion(result_directory)
         result = {
             'success': True,
@@ -545,13 +589,28 @@ def process_pdf_image(file_path, task_id=None):
             }
         }
 
+        if return_directory:
+            return result, result_directory
         return result
 
     except Exception as e:
         import traceback
         error_msg = f"process_pdf_image 异常: {str(e)}"
         logger.error(f"{error_msg}\n{traceback.format_exc()}")
-        return {'success': False, 'error': str(e)}
+        result = {'success': False, 'error': str(e)}
+        if return_directory:
+            return result, None
+        return result
+    finally:
+        if loop:
+            try:
+                loop.stop()
+            except Exception:
+                pass
+            try:
+                loop.close()
+            except Exception:
+                pass
 
 @app.route('/api/chat/stream', methods=['POST'])
 def api_chat_stream():
@@ -822,6 +881,7 @@ def internal_error(error):
         'success': False,
         'error': '服务器内部错误'
     }), 500
+
 
 
 if __name__ == '__main__':

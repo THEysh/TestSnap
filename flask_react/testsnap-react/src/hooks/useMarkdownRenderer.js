@@ -86,7 +86,10 @@ function enhanceBlocks(root) {
       const url = (typeof window !== 'undefined')
         ? (window.location.origin + window.location.pathname + '#/chat?new=1')
         : '#/chat?new=1';
-      window.open(url, 'TextSnapChat');
+      const w = window.open(url, 'TextSnapChat');
+      if (!w) {
+        window.location.hash = '#/chat?new=1';
+      }
       e.stopPropagation();
     });
     node.dataset.chatEnhanced = '1';

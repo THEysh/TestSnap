@@ -4,15 +4,20 @@ const CONV_KEY = 'textsnap_chat_conversations';
 const TARGET_KEY = 'textsnap_chat_target';
 
 export function enqueueBlock(payload) {
-  const list = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
-  const targetConvId = localStorage.getItem(TARGET_KEY) || null;
-  list.push({
-    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
-    convId: targetConvId,
-    ...payload,
-    createdAt: Date.now(),
-  });
-  localStorage.setItem(QUEUE_KEY, JSON.stringify(list));
+  try {
+    const list = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
+    const targetConvId = localStorage.getItem(TARGET_KEY) || null;
+    list.push({
+      id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+      convId: targetConvId,
+      ...payload,
+      createdAt: Date.now(),
+    });
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(list));
+    window.dispatchEvent(new CustomEvent('textsnap_chat_queue_updated'));
+  } catch (_) {
+    // ignore
+  }
 }
 
 export function consumeQueue() {

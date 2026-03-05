@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import List, Dict, Any
 import requests
 from PIL import Image
-from openai import AsyncOpenAI
+import asyncio
 from srcProject.config.constants import BlockType
 from srcProject.config.settings import  FLOW_USE_MODEL_NAME
 from srcProject.models.flow_base_api import FlowOCR, image_to_base64
@@ -15,12 +15,6 @@ class Silicon(FlowOCR):
             self.api_keys = [api_keys]
         elif isinstance(api_keys, list):
             self.api_keys = api_keys
-        self.client = AsyncOpenAI(
-            api_key=self.api_keys[0],
-            base_url=base_url,
-            timeout=60.0,
-            max_retries=2
-        )
         super().__init__(api_keys, base_url, self.api_model_name)
 
     def _load_model(self):
@@ -77,9 +71,13 @@ class Silicon(FlowOCR):
         text = ""
         try:
             inf_instruction = await self.instruction(inf_Class_key)
-            response = await self.client.chat.completions.create(
-                model=self.api_model_name,
-                messages=[
+            api_key, key_index = self._get_key()
+            if not api_key:
+                return ""
+            url = f"{self.api_url}/chat/completions"
+            payload = {
+                "model": self.api_model_name,
+                "messages": [
                     {
                         "role": "user",
                         "content": [
@@ -97,12 +95,29 @@ class Silicon(FlowOCR):
                         ]
                     }
                 ],
-                stream=False,
-                temperature=0,
-                max_tokens=2048
+                "stream": False,
+                "temperature": 0,
+                "max_tokens": 2048
+            }
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            }
+            response = await asyncio.to_thread(
+                requests.post,
+                url,
+                json=payload,
+                headers=headers,
+                timeout=60
             )
-            if response.choices:
-                text = response.choices[0].message.content or ""
+            if response.status_code >= 400:
+                self._set_key_index(key_index)
+                return ""
+            data = response.json() if response.content else {}
+            choices = data.get("choices") or []
+            if choices:
+                message = choices[0].get("message") or {}
+                text = message.get("content") or ""
             return text
         except Exception as e:
             print(f"API 请求或处理过程中发生错误: {e}")

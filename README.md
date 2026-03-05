@@ -166,16 +166,6 @@ gpt-api:
   model_name: Pro/Qwen/Qwen2.5-VL-7B-Instruct
 ```
 
-#### 示例二：Google Gemini
-
-```yaml
-gpt-api:
-  api_key: ["AIzaSyB***", "AIza***", "AIzaS***"]
-  api_name: google
-  base_url: https://generativelanguage.googleapis.com
-  model_name: models/gemini-2.0-flash
-```
-
 ---
 
 ## ▶️ 使用方法
