@@ -148,12 +148,12 @@ const useFileProcess = () => {
               if (payload?.type === 'append' && payload.content) {
                 setStreamContent(prev => prev + payload.content);
               }
-            } catch (e) {
+            } catch {
               continue;
             }
           }
         }
-      } catch (e) {
+      } catch {
         return;
       }
     };

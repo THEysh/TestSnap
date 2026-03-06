@@ -17,7 +17,7 @@ export function extractImageUrlsFromHtml(html) {
           try {
             const origin = typeof window !== 'undefined' ? window.location.origin : '';
             return origin ? origin + src : src;
-          } catch (_) {
+          } catch {
             return src;
           }
         }
@@ -26,12 +26,12 @@ export function extractImageUrlsFromHtml(html) {
           const origin = typeof window !== 'undefined' ? window.location.origin : '';
           const pathname = typeof window !== 'undefined' ? window.location.pathname.replace(/\/+$/, '') : '';
           return origin ? `${origin}/${src}` : `${pathname}/${src}`;
-        } catch (_) {
+        } catch {
           return src;
         }
       });
     return urls;
-  } catch (_) {
+  } catch {
     return [];
   }
 }

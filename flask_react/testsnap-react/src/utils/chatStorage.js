@@ -2,6 +2,50 @@
 const QUEUE_KEY = 'textsnap_chat_queue';
 const CONV_KEY = 'textsnap_chat_conversations';
 const TARGET_KEY = 'textsnap_chat_target';
+const HEARTBEAT_KEY = 'textsnap_chat_heartbeat';
+const AUTO_OPEN_KEY = 'textsnap_chat_auto_open';
+const PENDING_COUNT_KEY = 'textsnap_chat_pending_count';
+
+export function getQueueLength() {
+  try {
+    const list = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
+    return Array.isArray(list) ? list.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function getChatHeartbeat() {
+  const raw = localStorage.getItem(HEARTBEAT_KEY);
+  const n = raw ? Number(raw) : 0;
+  return Number.isFinite(n) ? n : 0;
+}
+
+export function setChatHeartbeat(ts) {
+  const n = typeof ts === 'number' ? ts : Date.now();
+  localStorage.setItem(HEARTBEAT_KEY, String(n));
+}
+
+export function getChatAutoOpen() {
+  const raw = localStorage.getItem(AUTO_OPEN_KEY);
+  if (raw === null) return true;
+  return raw === '1';
+}
+
+export function setChatAutoOpen(value) {
+  localStorage.setItem(AUTO_OPEN_KEY, value ? '1' : '0');
+}
+
+export function getChatPendingCount() {
+  const raw = localStorage.getItem(PENDING_COUNT_KEY);
+  const n = raw ? Number(raw) : 0;
+  return Number.isFinite(n) ? n : 0;
+}
+
+export function setChatPendingCount(count) {
+  const n = typeof count === 'number' ? count : Number(count);
+  localStorage.setItem(PENDING_COUNT_KEY, String(Number.isFinite(n) ? n : 0));
+}
 
 export function enqueueBlock(payload) {
   const list = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
@@ -17,7 +61,9 @@ export function enqueueBlock(payload) {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('textsnap_chat_queue_updated'));
     }
-  } catch (_) {}
+  } catch {
+    void 0;
+  }
 }
 
 export function consumeQueue() {

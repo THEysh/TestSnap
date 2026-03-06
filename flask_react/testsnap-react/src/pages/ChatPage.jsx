@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { MessageSquare, Plus, Paperclip, Image as ImageIcon, FileText, Table, Square } from 'lucide-react';
 import './ChatPage.css';
 import '../components/MarkdownViewer.css';
-import { getConversations, createConversation, consumeQueue, addMessage, setTargetConversation, deleteConversation, updateLastAssistantMessage, updateLastAssistantReasoning } from '../utils/chatStorage';
+import { getConversations, createConversation, consumeQueue, addMessage, setTargetConversation, deleteConversation, updateLastAssistantMessage, updateLastAssistantReasoning, setChatHeartbeat, setChatPendingCount } from '../utils/chatStorage';
 import ChatMarkdown from './ChatMarkdown';
 import { buildMessages } from '../utils/buildChatMessages';
 
@@ -111,6 +111,40 @@ export default function ChatPage() {
   const [enableReasoning, setEnableReasoning] = useState(false);
   const canThink = useMemo(() => canThinkModels.includes(selectedModel), [canThinkModels, selectedModel]);
 
+  useEffect(() => {
+    const tick = () => {
+      try {
+        setChatHeartbeat(Date.now());
+      } catch {
+        return;
+      }
+    };
+    const handleUnload = () => {
+      try {
+        setChatHeartbeat(0);
+        setChatPendingCount(0);
+      } catch {
+        return;
+      }
+    };
+    tick();
+    const id = window.setInterval(tick, 3000);
+    window.addEventListener('beforeunload', handleUnload);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener('beforeunload', handleUnload);
+      handleUnload();
+    };
+  }, []);
+
+  useEffect(() => {
+    try {
+      setChatPendingCount(attachments.length);
+    } catch {
+      return;
+    }
+  }, [attachments.length]);
+
   const handleCopy = async (text, id) => {
     const value = (text || '').trim();
     if (!value) return;
@@ -132,7 +166,7 @@ export default function ChatPage() {
       setTimeout(() => {
         setCopiedId((prev) => (prev === id ? null : prev));
       }, 1500);
-    } catch (_) {
+    } catch {
       setCopiedId(null);
     }
   };
@@ -165,13 +199,13 @@ export default function ChatPage() {
         if (ct.includes('application/json')) {
           try {
             return JSON.parse(txt);
-          } catch (e) {
+          } catch {
             throw new Error('JSON解析失败');
           }
         }
         try {
           return JSON.parse(txt);
-        } catch (e) {
+        } catch {
           return { success: false, error: txt.slice(0, 300) };
         }
       } catch (e) {
@@ -242,7 +276,7 @@ export default function ChatPage() {
                 piece = obj.choices[0].delta.content;
               }
             }
-          } catch (_) {
+          } catch {
             piece = '';
           }
           if (!piece) piece = payloadStr;
@@ -266,7 +300,9 @@ export default function ChatPage() {
         } finally {
           try {
             reader.releaseLock();
-          } catch (_) {}
+          } catch {
+            void 0;
+          }
         }
         return { success: true };
       } catch (e) {
@@ -296,7 +332,7 @@ export default function ChatPage() {
           body: JSON.stringify(payload),
         });
         return;
-      } catch (_) {
+      } catch {
         if (i === endpoints.length - 1) return;
       }
     }
@@ -309,7 +345,9 @@ export default function ChatPage() {
     if (convId && convId !== activeStreamConv) return;
     try {
       streamAbortRef.current?.abort();
-    } catch (_) {}
+    } catch {
+      void 0;
+    }
     cancelChat({ convId: activeStreamConv, requestId: activeReqId });
     const conv = (getConversations().find(c => c.id === activeStreamConv) || { messages: [] });
     const msgs = conv.messages || [];
@@ -385,8 +423,8 @@ export default function ChatPage() {
     if (preview.open && previewContentRef.current && typeof window !== 'undefined' && window.MathJax) {
       try {
         window.MathJax.typesetPromise([previewContentRef.current]);
-      } catch (e) {
-        // ignore
+      } catch {
+        void 0;
       }
     }
   }, [preview]);
@@ -698,7 +736,13 @@ export default function ChatPage() {
                           </button>
                           <button
                             className="attach-remove"
-                            onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
+                            onClick={() => {
+                              setAttachments((prev) => {
+                                const next = prev.slice();
+                                next.splice(i, 1);
+                                return next;
+                              });
+                            }}
                           >
                             移除
                           </button>
