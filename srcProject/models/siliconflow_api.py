@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import List, Dict, Any
+import os
 import requests
 from PIL import Image
 import asyncio
@@ -21,18 +22,18 @@ class Silicon(FlowOCR):
         """
         加载模型（对于API客户端，这里主要是验证API密钥）
         """
-        print("初始化Siliconflow, 获取模型列表")
+        print("初始化Siliconflow")
         if not self.api_keys[0]:
             raise ValueError("API密钥不能为空")
-        res = self.get_models()
-        if res is not None:
+        validate = (os.getenv("TEXTSNAP_VALIDATE_SILICONFLOW_MODELS", "") or "").strip().lower() in ("1", "true", "yes")
+        if validate:
             try:
-                total = len(res)
+                self.get_models(timeout_seconds=3)
             except Exception:
-                total = 0
-            print(f"Siliconflow初始化成功, 当前激活的模型:{self.api_model_name}")
+                pass
+        print(f"Siliconflow初始化成功, 当前激活的模型:{self.api_model_name}")
 
-    def get_models(self) -> List[dict]:
+    def get_models(self, timeout_seconds: int = 10) -> List[dict]:
         """
         使用 requests 库从 ChatAnywhere API 获取模型列表
         （requests 是同步库，如果需要异步，请使用 aiohttp 等）
@@ -43,7 +44,7 @@ class Silicon(FlowOCR):
             headers = {
                 'Authorization': f'Bearer {self.api_keys[0]}'
             }
-            response = requests.get(url, headers=headers, params=querystring)
+            response = requests.get(url, headers=headers, params=querystring, timeout=timeout_seconds)
             response.raise_for_status()
             res = []
             if response.json() and "data" in response.json():

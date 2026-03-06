@@ -57,6 +57,7 @@ class ModelManager:
             model_Path=READ_WEIGHTS_PATH,
             device=device
         )
+        self._read_model_name = READ_MODEL_NAME
         print(f"已加载阅读顺序模型/算法: {READ_MODEL_NAME}")
 
         self.ocr_recognizer = ModelFactory.create(
@@ -65,6 +66,10 @@ class ModelManager:
             api_name=FLOW_API_NAME,
             model_name= FLOW_USE_MODEL_NAME
         )
+        self._ocr_api_name = FLOW_API_NAME
+        self._ocr_base_url = FLOW_URL
+        self._ocr_model_name = FLOW_USE_MODEL_NAME
+        self._ocr_api_keys = self._normalize_api_keys(FLOW_API_KEY)
         print(f"已加载OCR-api模型: {FLOW_API_NAME},当前激活: {FLOW_USE_MODEL_NAME}")
 
         # 加载聊天模型
@@ -77,12 +82,33 @@ class ModelManager:
         )
         print(f"已加载Chat-api模型: {CHAT_API_NAME}, 当前激活: {CHAT_MODEL_NAME}")
 
+    def _normalize_api_keys(self, api_key: list | str | None) -> tuple[str, ...]:
+        if api_key is None:
+            return tuple()
+        if isinstance(api_key, str):
+            k = api_key.strip()
+            return (k,) if k else tuple()
+        if isinstance(api_key, list):
+            out: list[str] = []
+            for it in api_key:
+                if not it:
+                    continue
+                s = str(it).strip()
+                if s:
+                    out.append(s)
+            return tuple(out)
+        s = str(api_key).strip()
+        return (s,) if s else tuple()
+
     def change_read_model (self, model_name:str):
+        if model_name and model_name == getattr(self, "_read_model_name", None):
+            return True
         self.read_model = ModelFactory.create(
             model_name=model_name,
             model_Path=READ_WEIGHTS_PATH,
             device=self.device
         )
+        self._read_model_name = model_name
         print(f"已加载阅读顺序模型/算法: {model_name}")
         return True
 
@@ -103,12 +129,36 @@ class ModelManager:
             api_name = FLOW_API_NAME
         if str(api_name).lower() != 'siliconflow':
             raise ValueError("仅支持 siliconflow 作为 OCR API")
+
+        next_keys = self._normalize_api_keys(api_key)
+        next_url = str(base_url or "").strip()
+        next_model = str(model_name or "").strip()
+        cur_keys = getattr(self, "_ocr_api_keys", tuple())
+        cur_url = str(getattr(self, "_ocr_base_url", "") or "").strip()
+        cur_model = str(getattr(self, "_ocr_model_name", "") or "").strip()
+
+        if next_keys == cur_keys and next_url == cur_url and next_model == cur_model:
+            return True
+
+        if next_keys == cur_keys and next_url == cur_url and hasattr(self.ocr_recognizer, "api_model_name"):
+            try:
+                setattr(self.ocr_recognizer, "api_model_name", next_model)
+                self._ocr_model_name = next_model
+                print(f"已加载OCR-api模型: {api_name},当前激活: {next_model}")
+                return True
+            except Exception:
+                pass
+
         self.ocr_recognizer = ModelFactory.create(
             api_key=api_key,
             base_url=base_url,
             api_name=api_name,
             model_name= model_name
         )
+        self._ocr_api_name = api_name
+        self._ocr_base_url = next_url
+        self._ocr_model_name = next_model
+        self._ocr_api_keys = next_keys
         print(f"已加载OCR-api模型: {api_name},当前激活: {model_name}")
         return True
 
