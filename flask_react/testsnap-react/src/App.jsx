@@ -78,56 +78,51 @@ function App() {
     return uploadStatus;
   };
 
-  return (
-    <>
-      <div style={{ display: isChat ? 'none' : 'block' }}>
-        <div className="container">
-          <Header />
-          <Controls
-            onFileUpload={handleFileUpload}
-            onFileProcess={handleProcessFile}
-            onClearFile={handleClearFile}
+  return isChat ? (
+    <Suspense fallback={<div style={{ padding: 20 }}>加载聊天页面...</div>}>
+      <ChatPage />
+    </Suspense>
+  ) : (
+    <div className="container">
+      <Header />
+      <Controls
+        onFileUpload={handleFileUpload}
+        onFileProcess={handleProcessFile}
+        onClearFile={handleClearFile}
+        file={file}
+        status={getCurrentStatus()}
+        fileType={fileType}
+      />
+      <div className="pdf-container">
+        {fileType === 'pdf' ? (
+          <PDFViewer
+            title="PDF预览"
             file={file}
-            status={getCurrentStatus()}
-            fileType={fileType}
+            processedFileUrl={processedFileUrl}
+            downloadLink={downloadLink}
           />
-          <div className="pdf-container">
-            {fileType === 'pdf' ? (
-              <PDFViewer
-                title="PDF预览"
-                file={file}
-                processedFileUrl={processedFileUrl}
-                downloadLink={downloadLink}
-              />
-            ) : fileType === 'image' ? (
-              <ImageViewer
-                file={file}
-                processedFileUrl={processedFileUrl}
-              />
-            ) : (
-              <div className="viewer-placeholder">
-                <div className="placeholder-icon">📄/🖼️</div>
-                <p>请上传PDF或图片文件</p>
-              </div>
-            )}
+        ) : fileType === 'image' ? (
+          <ImageViewer
+            file={file}
+            processedFileUrl={processedFileUrl}
+          />
+        ) : (
+          <div className="viewer-placeholder">
+            <div className="placeholder-icon">📄/🖼️</div>
+            <p>请上传PDF或图片文件</p>
           </div>
-          <div className="markdown-container">
-            <MarkdownViewer
-              autoLoadPath={autoLoadMarkdownPath}
-              streamContent={streamContent}
-              streamActive={processStatus === 'processing'}
-              progress={progress}
-              progressMessage={progressMessage}
-            />
-          </div>
-        </div>
+        )}
       </div>
-      <div style={{ display: isChat ? 'block' : 'none' }}>
-        <Suspense fallback={<div style={{ padding: 20 }}>加载聊天页面...</div>}>
-          <ChatPage />
-        </Suspense>
+      <div className="markdown-container">
+        <MarkdownViewer
+          autoLoadPath={autoLoadMarkdownPath}
+          streamContent={streamContent}
+          streamActive={processStatus === 'processing'}
+          progress={progress}
+          progressMessage={progressMessage}
+        />
       </div>
-    </>
+    </div>
   );
 }
 
