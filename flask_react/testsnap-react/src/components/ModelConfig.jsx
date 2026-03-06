@@ -1,25 +1,35 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { ENDPOINTS } from "../constants/apiConfig"; // 导入 API 端点
 import {
   BookOpen,
-  Cpu,
   Key,
   Globe,
   FileText
 } from "lucide-react"; // 引入图标
 import "./ModelConfig.css";
 
+const SUPPORTED_OCR_MODELS = [
+  "Qwen/Qwen3-VL-30B-A3B-Instruct",
+  "Qwen/Qwen3-VL-8B-Instruct",
+  "Qwen/Qwen3-VL-32B-Instruct",
+  "Qwen/Qwen2.5-VL-72B-Instruct",
+  "Qwen/Qwen2.5-VL-32B-Instruct",
+  "Pro/Qwen/Qwen2.5-VL-7B-Instruct",
+  "Qwen/Qwen2-VL-72B-Instruct",
+  "deepseek-ai/deepseek-vl2",
+  "deepseek-ai/DeepSeek-OCR",
+  "zai-org/GLM-4.5V",
+  "zai-org/GLM-4.6V"
+];
+
 const ModelConfig = () => {
   // read_model 下拉框的状态
   const [readModel, setReadModel] = useState("Xy_Cut");
-  // ocr_api_model 下拉框的状态
-  const [ocrApiModel, setOcrApiModel] = useState("");
   // API 配置输入框的状态
   const [config, setConfig] = useState({
     apiKey: "",
-    apiName: "",
-    baseUrl: "",
-    modelName: ""
+    baseUrl: "https://api.siliconflow.cn/v1",
+    modelName: SUPPORTED_OCR_MODELS[0] || ""
   });
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
@@ -27,18 +37,6 @@ const ModelConfig = () => {
   // 处理 read_model 下拉菜单的变化
   const handleReadModelChange = (e) => {
     setReadModel(e.target.value);
-  };
-
-  // 处理 ocr_api_model 下拉菜单的变化
-  const handleOcrApiModelChange = (e) => {
-    setOcrApiModel(e.target.value);
-    // 当选择新的API时，重置输入框内容
-    setConfig({
-      apiKey: "",
-      apiName: "",
-      baseUrl: "",
-      modelName: ""
-    });
   };
   // 状态消息的HTML内容
   const createMarkup = () => {
@@ -53,16 +51,6 @@ const ModelConfig = () => {
       [name]: value,
     }));
   };
-  // 监听变化，动态设置默认值
-  useEffect(() => {
-    if (ocrApiModel == "google") {
-      setConfig((prev) => ({
-         ...prev, baseUrl: "https://generativelanguage.googleapis.com" }));
-    } else if (ocrApiModel == "siliconflow") {
-      setConfig((prev) => ({
-         ...prev, baseUrl: "https://api.siliconflow.cn/v1" }));
-    }
-  }, [ocrApiModel]); 
   
   // 封装API调用逻辑
   const handleUpdateConfig = async () => {
@@ -75,15 +63,22 @@ const ModelConfig = () => {
       read_model: readModel
     };
 
-    // 如果选择了 ocr_api_model，则添加其配置
-    if (ocrApiModel) {
-      payload.ocr_api_model = {
-        api_name: ocrApiModel,
-        api_key: config.apiKey,
-        base_url: config.baseUrl,
-        model_name: config.modelName
-      };
+    const apiKey = (config.apiKey || "").trim();
+    const baseUrl = (config.baseUrl || "").trim();
+    const modelName = (config.modelName || "").trim();
+    if (!apiKey || !baseUrl || !modelName) {
+      setStatusMessage("请填写 Base URL / API Key，并选择 Model Name。");
+      setIsSuccess(false);
+      setIsLoading(false);
+      return;
     }
+
+    payload.ocr_api_model = {
+      api_name: "siliconflow",
+      api_key: apiKey,
+      base_url: baseUrl,
+      model_name: modelName
+    };
 
     try {
       const response = await fetch(ENDPOINTS.MODEL_CONFIG, {
@@ -138,57 +133,39 @@ const ModelConfig = () => {
           </select>
         </label>
 
-        {/* 下拉框2：ocr_api_model */}
         <label className="form-row">
-          <Cpu className="icon" />
-          <span>选择 API 模型：</span>
-          <select value={ocrApiModel} onChange={handleOcrApiModelChange}>
-            <option value="">默认</option>
-            <option value="siliconflow">siliconflow</option>
-            <option value="google">google</option>
-          </select>
+          <Key className="icon" />
+          <span>API Key：</span>
+          <input
+            type="text"
+            name="apiKey"
+            value={config.apiKey}
+            onChange={handleConfigChange}
+            placeholder="请输入 API Key"
+          />
         </label>
 
-        {/* 当选择了API模型时，才显示输入框 */}
-        {ocrApiModel && (
-          <>
-            <label className="form-row">
-              <Key className="icon" />
-              <span>API Key：</span>
-              <input
-                type="text"
-                name="apiKey"
-                value={config.apiKey}
-                onChange={handleConfigChange}
-                placeholder="请输入 API Key"
-              />
-            </label>
+        <label className="form-row">
+          <Globe className="icon" />
+          <span>Base URL：</span>
+          <input
+            type="text"
+            name="baseUrl"
+            value={config.baseUrl}
+            onChange={handleConfigChange}
+            placeholder="请输入 Base URL"
+          />
+        </label>
 
-            <label className="form-row">
-              <Globe className="icon" />
-              <span>Base URL：</span>
-              <input
-                type="text"
-                name="baseUrl"
-                value={config.baseUrl}
-                onChange={handleConfigChange}
-                placeholder="请输入 Base URL"
-              />
-            </label>
-
-            <label className="form-row">
-              <FileText className="icon" />
-              <span>Model Name：</span>
-              <input
-                type="text"
-                name="modelName"
-                value={config.modelName}
-                onChange={handleConfigChange}
-                placeholder="请输入 Model Name"
-              />
-            </label>
-          </>
-        )}
+        <label className="form-row">
+          <FileText className="icon" />
+          <span>Model Name：</span>
+          <select name="modelName" value={config.modelName} onChange={handleConfigChange}>
+            {SUPPORTED_OCR_MODELS.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </label>
       </div>
 
       {/* 更新配置按钮 */}

@@ -225,6 +225,10 @@ def update_model_config():
             return jsonify({"status": "error", "message": "未提供任何模型配置进行更新"}), 400
         if ocr_api_model and (not isinstance(ocr_api_model, dict) or not ocr_api_model.get("model_name")):
             return jsonify({"status": "error", "message": "ocr_api_model配置缺失关键字段 (model_name)"}), 400
+        if isinstance(ocr_api_model, dict):
+            api_name = str(ocr_api_model.get("api_name") or "")
+            if api_name and api_name.lower() != "siliconflow":
+                return jsonify({"status": "error", "message": "当前仅支持 siliconflow 作为 OCR API"}), 400
 
         worker, _, _, _ = _get_services()
         resp = worker.send_command("update_config", {"read_model": read_model, "ocr_api_model": ocr_api_model})

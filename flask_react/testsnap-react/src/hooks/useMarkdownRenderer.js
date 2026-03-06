@@ -102,7 +102,7 @@ function ensureChatLauncher() {
   el.className = 'textsnap-chat-launcher';
   el.innerHTML = `
     <div class="textsnap-chat-launcher-row">
-      <div class="textsnap-chat-launcher-title">聊天队列</div>
+      <div class="textsnap-chat-launcher-title">卡片队列</div>
       <div class="textsnap-chat-launcher-count" data-role="count">0</div>
     </div>
     <div class="textsnap-chat-launcher-row">

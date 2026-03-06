@@ -38,14 +38,19 @@ const useModelConfig = () => {
   ]);
   const [ocrApiModels] = useState([
     // Siliconflow 支持的模型
-    { api_name: 'siliconflow', model_name: 'Pro/Qwen/Qwen2.5-VL-7B-Instruct' },
-    { api_name: 'siliconflow', model_name: 'Qwen/Qwen2.5-VL-32B-Instruct' },
+    { api_name: 'siliconflow', model_name: 'Qwen/Qwen3-VL-30B-A3B-Instruct' },
+    { api_name: 'siliconflow', model_name: 'Qwen/Qwen3-VL-8B-Instruct' },
+    { api_name: 'siliconflow', model_name: 'Qwen/Qwen3-VL-32B-Instruct' },
     { api_name: 'siliconflow', model_name: 'Qwen/Qwen2.5-VL-72B-Instruct' },
+    { api_name: 'siliconflow', model_name: 'Qwen/Qwen2.5-VL-32B-Instruct' },
+    { api_name: 'siliconflow', model_name: 'Qwen/Qwen2-VL-72B-Instruct' },
+    { api_name: 'siliconflow', model_name: 'baidu/ERNIE-4.5-VL-424B-A47B-Paddle' },
+    { api_name: 'siliconflow', model_name: 'baidu/ERNIE-4.5-VL-28B-A3B-Paddle' },
+    { api_name: 'siliconflow', model_name: 'Wan-AI/Wan2.2-I2V-A14B' },
     { api_name: 'siliconflow', model_name: 'deepseek-ai/deepseek-vl2' },
-    // Google 支持的模型
-    { api_name: 'google', model_name: 'models/gemma-3-27b-it' },
-    { api_name: 'google', model_name: 'models/gemini-2.0-flash' },
-    { api_name: 'google', model_name: 'models/gemini-2.5-flash' }
+    { api_name: 'siliconflow', model_name: 'deepseek-ai/DeepSeek-OCR' },
+    { api_name: 'siliconflow', model_name: 'zai-org/GLM-4.5V' },
+    { api_name: 'siliconflow', model_name: 'zai-org/GLM-4.6V' }
   ]);
 
   // 状态管理：保存当前选中的模型
