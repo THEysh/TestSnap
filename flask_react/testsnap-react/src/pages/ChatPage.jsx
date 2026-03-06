@@ -49,8 +49,32 @@ function Sidebar({ convs, activeId, onSelect, onCreate, onDelete }) {
       <div className="sider-footer">
         <a
           className="back-link"
-          href={typeof window !== 'undefined' ? window.location.origin + window.location.pathname : '/'}
+          href="#/"
           title="返回主页面"
+          onClick={(e) => {
+            e.preventDefault();
+            try {
+              const opener = typeof window !== 'undefined' ? window.opener : null;
+              if (opener && !opener.closed) {
+                try {
+                  opener.focus();
+                } catch (_) {}
+                try {
+                  const hash = String(opener.location?.hash || '');
+                  if (!hash || hash.startsWith('#/chat')) {
+                    opener.location.hash = '#/';
+                  }
+                } catch (_) {}
+                try {
+                  window.close();
+                  return;
+                } catch (_) {}
+              }
+            } catch (_) {}
+            try {
+              window.location.hash = '#/';
+            } catch (_) {}
+          }}
         >
           返回主页面
         </a>

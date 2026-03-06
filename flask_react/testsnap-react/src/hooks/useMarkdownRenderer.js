@@ -85,10 +85,25 @@ function enhanceBlocks(root) {
       enqueueBlock(payload);
       const hash = typeof window !== 'undefined' ? (window.location.hash || '') : '';
       if (!hash.startsWith('#/chat')) {
-        const url = (typeof window !== 'undefined')
-          ? (window.location.origin + window.location.pathname + '#/chat?new=1')
-          : '#/chat?new=1';
-        window.open(url, 'TextSnapChat');
+        let w = null;
+        try {
+          w = window.open('', 'TextSnapChat');
+          if (w) {
+            const target = window.location.origin + window.location.pathname + '#/chat';
+            const wHash = String(w.location && w.location.hash ? w.location.hash : '');
+            if (!wHash.startsWith('#/chat')) {
+              w.location.href = target;
+            }
+          }
+          if (w) w.focus();
+        } catch (_) {
+          w = null;
+        }
+        if (!w) {
+          try {
+            window.location.hash = '#/chat';
+          } catch (_) {}
+        }
       }
       e.stopPropagation();
     });
