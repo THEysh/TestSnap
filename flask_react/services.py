@@ -103,19 +103,25 @@ class WorkerManager:
         self._api_base_url = api_base_url
         self._on_result_directory = on_result_directory
 
-        self._lock = threading.Lock()
-        self._ctx: multiprocessing.context.BaseContext | None = None
-        self._in_q: multiprocessing.queues.Queue | None = None
-        self._out_q: multiprocessing.queues.Queue | None = None
-        self._process: multiprocessing.Process | None = None
-        self._reader_thread: threading.Thread | None = None
+        self._mode = (os.getenv("TEXTSNAP_WORKER_MODE", "embedded") or "embedded").lower()
 
-        self._gen = 0
+        self._lock = threading.Lock()
         self._inflight: set[str] = set()
         self._shutdown_event = threading.Event()
 
         self._pending_lock = threading.Lock()
         self._pending: dict[str, queue.Queue] = {}
+
+        self._slot_seq = 0
+        self._active: dict[str, Any] | None = None
+        self._standby: dict[str, Any] | None = None
+
+        self._daemon_lock = threading.Lock()
+        self._daemon_conn: Any | None = None
+        self._daemon_reader: threading.Thread | None = None
+        self._daemon_host = os.getenv("TEXTSNAP_WORKER_HOST", "127.0.0.1")
+        self._daemon_port = int(os.getenv("TEXTSNAP_WORKER_PORT", "7862"))
+        self._daemon_authkey = (os.getenv("TEXTSNAP_WORKER_AUTHKEY", "textsnap") or "textsnap").encode("utf-8")
 
         self._monitor_started = False
         atexit.register(self.shutdown)
@@ -124,24 +130,40 @@ class WorkerManager:
         if self._shutdown_event.is_set():
             return
         self._shutdown_event.set()
-        with self._lock:
-            in_q = self._in_q
-            proc = self._process
-        if in_q is not None:
-            try:
-                in_q.put(None)
-            except Exception:
-                pass
-        if proc is not None and proc.is_alive():
-            try:
-                proc.join(timeout=2)
-            except Exception:
-                pass
-            if proc.is_alive():
+        if self._mode == "daemon":
+            with self._daemon_lock:
+                conn = self._daemon_conn
+                self._daemon_conn = None
+            if conn is not None:
                 try:
-                    proc.terminate()
+                    conn.close()
                 except Exception:
                     pass
+            return
+
+        with self._lock:
+            active = self._active
+            standby = self._standby
+            self._active = None
+            self._standby = None
+        for slot in [active, standby]:
+            if not slot:
+                continue
+            try:
+                slot.get("in_q").put(None)
+            except Exception:
+                pass
+            proc = slot.get("proc")
+            if proc is not None and proc.is_alive():
+                try:
+                    proc.join(timeout=2)
+                except Exception:
+                    pass
+                if proc.is_alive():
+                    try:
+                        proc.terminate()
+                    except Exception:
+                        pass
 
     def start_monitor(self) -> None:
         if self._monitor_started:
@@ -151,16 +173,11 @@ class WorkerManager:
         self._monitor_started = True
 
         def loop() -> None:
-            last_pid: int | None = None
             while not self._shutdown_event.is_set():
                 try:
                     self.ensure_running()
-                    with self._lock:
-                        proc = self._process
-                        pid = proc.pid if proc is not None else None
-                    if pid and pid != last_pid:
-                        self.send_command("warmup", {}, timeout_seconds=600)
-                        last_pid = pid
+                    if self._mode != "daemon":
+                        self._warmup_if_needed()
                 except Exception:
                     pass
                 time.sleep(2)
@@ -171,19 +188,46 @@ class WorkerManager:
     def ensure_running(self) -> None:
         if self._shutdown_event.is_set():
             return
+        if self._mode == "daemon":
+            self._ensure_daemon_connected()
+            return
         with self._lock:
-            if self._process is not None and self._process.is_alive():
-                return
-            self._start_worker_locked()
+            if not self._active or not self._active.get("proc") or not self._active["proc"].is_alive():
+                self._active = self._start_local_worker_locked(role="active")
+
+            if not self._standby or not self._standby.get("proc") or not self._standby["proc"].is_alive():
+                self._standby = self._start_local_worker_locked(role="standby")
+
+    def _warmup_if_needed(self) -> None:
+        slots: list[dict[str, Any]] = []
+        with self._lock:
+            if self._active and not self._active.get("warmed"):
+                slots.append(self._active)
+            if self._standby and not self._standby.get("warmed"):
+                slots.append(self._standby)
+        for slot in slots:
+            try:
+                resp = self._send_command_to_slot(slot, "warmup", {}, timeout_seconds=600)
+                if resp and resp.get("success"):
+                    with self._lock:
+                        if slot.get("role") == "active" and self._active and self._active.get("slot_id") == slot.get("slot_id"):
+                            self._active["warmed"] = True
+                        if slot.get("role") == "standby" and self._standby and self._standby.get("slot_id") == slot.get("slot_id"):
+                            self._standby["warmed"] = True
+            except Exception:
+                continue
 
     def submit_task(self, task_id: str, file_path: str, file_type: str) -> None:
         self.ensure_running()
         with self._lock:
             self._inflight.add(task_id)
-            in_q = self._in_q
-        if in_q is None:
+            active = self._active
+        if self._mode == "daemon":
+            self._daemon_send({"kind": "task", "task_id": task_id, "file_path": file_path, "file_type": file_type})
+            return
+        if not active:
             raise RuntimeError("worker未就绪")
-        in_q.put({"task_id": task_id, "file_path": file_path, "file_type": file_type})
+        active["in_q"].put({"task_id": task_id, "file_path": file_path, "file_type": file_type})
 
     def send_command(self, kind: str, payload: dict[str, Any], timeout_seconds: int = 20) -> dict[str, Any]:
         command_id = uuid.uuid4().hex
@@ -191,13 +235,21 @@ class WorkerManager:
         with self._pending_lock:
             self._pending[command_id] = response_q
         self.ensure_running()
-        with self._lock:
-            in_q = self._in_q
-        if in_q is None:
-            with self._pending_lock:
-                self._pending.pop(command_id, None)
-            return {"success": False, "error": "worker未就绪", "command_id": command_id}
-        in_q.put({"kind": kind, "command_id": command_id, "payload": payload})
+        if self._mode == "daemon":
+            try:
+                self._daemon_send({"kind": "command", "command_kind": kind, "command_id": command_id, "payload": payload})
+            except Exception:
+                with self._pending_lock:
+                    self._pending.pop(command_id, None)
+                return {"success": False, "error": "worker未就绪", "command_id": command_id}
+        else:
+            with self._lock:
+                active = self._active
+            if not active:
+                with self._pending_lock:
+                    self._pending.pop(command_id, None)
+                return {"success": False, "error": "worker未就绪", "command_id": command_id}
+            active["in_q"].put({"kind": kind, "command_id": command_id, "payload": payload})
         try:
             return response_q.get(timeout=timeout_seconds)
         except Exception:
@@ -205,42 +257,166 @@ class WorkerManager:
                 self._pending.pop(command_id, None)
             return {"success": False, "error": "worker响应超时", "command_id": command_id}
 
-    def _start_worker_locked(self) -> None:
-        self._gen += 1
-        local_gen = self._gen
+    def _start_local_worker_locked(self, role: str) -> dict[str, Any]:
+        self._slot_seq += 1
+        slot_id = self._slot_seq
 
-        self._ctx = multiprocessing.get_context("spawn")
-        self._in_q = self._ctx.Queue()
-        self._out_q = self._ctx.Queue()
-        self._process = self._ctx.Process(
+        ctx = multiprocessing.get_context("spawn")
+        in_q = ctx.Queue()
+        out_q = ctx.Queue()
+        proc = ctx.Process(
             target=_subprocess_worker_main,
-            args=(self._in_q, self._out_q, self._api_base_url),
+            args=(in_q, out_q, self._api_base_url),
             daemon=True,
         )
-        self._process.start()
+        proc.start()
 
         def reader_loop() -> None:
-            while True:
-                with self._lock:
-                    if local_gen != self._gen:
-                        return
-                    proc = self._process
-                    out_q = self._out_q
-                if proc is None or out_q is None:
-                    return
+            while not self._shutdown_event.is_set():
                 try:
                     msg = out_q.get(timeout=0.5)
                 except Exception:
                     if proc is not None and not proc.is_alive():
-                        self._handle_worker_crash(proc)
+                        self._handle_local_worker_crash(role, slot_id, proc)
                         return
                     continue
                 self._dispatch_worker_message(msg)
 
-        self._reader_thread = threading.Thread(
-            target=reader_loop, name="TextSnapWorkerReader", daemon=True
+        reader = threading.Thread(
+            target=reader_loop, name=f"TextSnapWorkerReader-{role}-{slot_id}", daemon=True
         )
-        self._reader_thread.start()
+        reader.start()
+        return {
+            "role": role,
+            "slot_id": slot_id,
+            "ctx": ctx,
+            "in_q": in_q,
+            "out_q": out_q,
+            "proc": proc,
+            "reader": reader,
+            "warmed": False,
+        }
+
+    def _handle_local_worker_crash(self, role: str, slot_id: int, dead_proc: multiprocessing.Process | None) -> None:
+        try:
+            if dead_proc is not None:
+                logger.error(
+                    f"处理进程退出: role={role}, pid={getattr(dead_proc, 'pid', None)}, exitcode={getattr(dead_proc, 'exitcode', None)}"
+                )
+            else:
+                logger.error(f"处理进程退出: role={role}")
+        except Exception:
+            pass
+
+        if role == "standby":
+            with self._lock:
+                if self._standby and self._standby.get("slot_id") == slot_id:
+                    self._standby = None
+            return
+
+        inflight: list[str]
+        with self._lock:
+            if self._active and self._active.get("slot_id") == slot_id:
+                self._active = None
+            inflight = list(self._inflight)
+            self._inflight.clear()
+
+            if self._standby and self._standby.get("proc") and self._standby["proc"].is_alive():
+                self._active = self._standby
+                self._active["role"] = "active"
+                self._standby = None
+
+            if not self._standby or not self._standby.get("proc") or not self._standby["proc"].is_alive():
+                self._standby = self._start_local_worker_locked(role="standby")
+
+        err_msg = "处理进程崩溃（0xC0000005），任务已中止"
+        try:
+            exitcode = getattr(dead_proc, "exitcode", None) if dead_proc is not None else None
+            if exitcode in (-1, 0xC000013A):
+                err_msg = "处理进程被中断，任务已中止"
+        except Exception:
+            pass
+
+        for task_id in inflight:
+            try:
+                complete_task(task_id, error=err_msg)
+            except Exception:
+                pass
+            try:
+                close_task_stream(task_id)
+            except Exception:
+                pass
+
+        with self._pending_lock:
+            pending = list(self._pending.items())
+            self._pending.clear()
+        for command_id, q in pending:
+            try:
+                q.put({"type": "command_result", "command_id": command_id, "success": False, "error": "worker已崩溃"})
+            except Exception:
+                pass
+
+    def _send_command_to_slot(self, slot: dict[str, Any] | None, kind: str, payload: dict[str, Any], timeout_seconds: int) -> dict[str, Any]:
+        if not slot:
+            raise RuntimeError("worker未就绪")
+        command_id = uuid.uuid4().hex
+        response_q: queue.Queue = queue.Queue(maxsize=1)
+        with self._pending_lock:
+            self._pending[command_id] = response_q
+        slot["in_q"].put({"kind": kind, "command_id": command_id, "payload": payload})
+        try:
+            return response_q.get(timeout=timeout_seconds)
+        except Exception:
+            with self._pending_lock:
+                self._pending.pop(command_id, None)
+            raise
+
+    def _ensure_daemon_connected(self) -> None:
+        with self._daemon_lock:
+            if self._daemon_conn is not None:
+                return
+            from multiprocessing.connection import Client
+
+            conn = Client((self._daemon_host, self._daemon_port), authkey=self._daemon_authkey)
+            self._daemon_conn = conn
+
+            def reader_loop() -> None:
+                while not self._shutdown_event.is_set():
+                    try:
+                        msg = conn.recv()
+                    except Exception:
+                        with self._daemon_lock:
+                            if self._daemon_conn is conn:
+                                self._daemon_conn = None
+                        inflight: list[str]
+                        with self._lock:
+                            inflight = list(self._inflight)
+                            self._inflight.clear()
+                        for task_id in inflight:
+                            try:
+                                complete_task(task_id, error="worker连接中断，任务已中止")
+                            except Exception:
+                                pass
+                            try:
+                                close_task_stream(task_id)
+                            except Exception:
+                                pass
+                        return
+                    if isinstance(msg, dict):
+                        self._dispatch_worker_message(msg)
+
+            self._daemon_reader = threading.Thread(
+                target=reader_loop, name="TextSnapDaemonReader", daemon=True
+            )
+            self._daemon_reader.start()
+
+    def _daemon_send(self, payload: dict[str, Any]) -> None:
+        self._ensure_daemon_connected()
+        with self._daemon_lock:
+            conn = self._daemon_conn
+        if conn is None:
+            raise RuntimeError("worker未就绪")
+        conn.send(payload)
 
     def _dispatch_worker_message(self, msg: dict[str, Any]) -> None:
         try:
@@ -301,56 +477,38 @@ class WorkerManager:
         except Exception:
             return
 
-    def _handle_worker_crash(self, dead_proc: multiprocessing.Process | None = None) -> None:
-        try:
-            if dead_proc is not None:
-                logger.error(
-                    f"处理进程退出: pid={getattr(dead_proc, 'pid', None)}, exitcode={getattr(dead_proc, 'exitcode', None)}"
-                )
-            else:
-                logger.error("处理进程退出")
-        except Exception:
-            pass
-
-        with self._lock:
-            inflight = list(self._inflight)
-            self._inflight.clear()
-            self._process = None
-            self._in_q = None
-            self._out_q = None
-            self._ctx = None
-            self._gen += 1
-
-        with self._pending_lock:
-            pending = list(self._pending.items())
-            self._pending.clear()
-
-        err_msg = "处理进程崩溃（0xC0000005），任务已中止"
-        try:
-            exitcode = getattr(dead_proc, "exitcode", None) if dead_proc is not None else None
-            if exitcode in (-1, 0xC000013A):
-                err_msg = "处理进程被中断，任务已中止"
-        except Exception:
-            pass
-
-        for task_id in inflight:
-            try:
-                complete_task(task_id, error=err_msg)
-            except Exception:
-                pass
-            try:
-                close_task_stream(task_id)
-            except Exception:
-                pass
-
-        for command_id, q in pending:
-            try:
-                q.put({"type": "command_result", "command_id": command_id, "success": False, "error": "worker已崩溃"})
-            except Exception:
-                pass
-
-
 def _subprocess_worker_main(in_q: Any, out_q: Any, api_base_url: str) -> None:
+    try:
+        os.environ.setdefault("OMP_NUM_THREADS", "1")
+        os.environ.setdefault("MKL_NUM_THREADS", "1")
+        os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+        os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+        os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
+    except Exception:
+        pass
+    try:
+        import cv2  # type: ignore
+
+        try:
+            cv2.setNumThreads(0)
+        except Exception:
+            pass
+    except Exception:
+        pass
+    try:
+        import torch  # type: ignore
+
+        try:
+            torch.set_num_threads(1)
+        except Exception:
+            pass
+        try:
+            torch.set_num_interop_threads(1)
+        except Exception:
+            pass
+    except Exception:
+        pass
+
     from srcProject.main_process_sequence import get_model_manager as worker_get_model_manager
     from srcProject.main_process_sequence import main as process_main
 

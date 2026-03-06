@@ -21,13 +21,15 @@ class Silicon(FlowOCR):
         """
         加载模型（对于API客户端，这里主要是验证API密钥）
         """
-        print(f"初始化Siliconflow, 获取模型列表")
+        print("初始化Siliconflow, 获取模型列表")
         if not self.api_keys[0]:
             raise ValueError("API密钥不能为空")
         res = self.get_models()
-        if res:
-            for model_inf in res:
-                print(model_inf)
+        if res is not None:
+            try:
+                total = len(res)
+            except Exception:
+                total = 0
             print(f"Siliconflow初始化成功, 当前激活的模型:{self.api_model_name}")
 
     def get_models(self) -> List[dict]:
@@ -45,7 +47,6 @@ class Silicon(FlowOCR):
             response.raise_for_status()
             res = []
             if response.json() and "data" in response.json():
-                print("成功获取模型列表：")
                 for model in response.json()["data"]:
                     res.append(model)
             return res
