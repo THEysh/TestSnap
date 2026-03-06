@@ -158,7 +158,8 @@ After downloading, ensure the directory structure is exactly as follows:
 
 ### 5️⃣ Configure LLM / VLM API (`config.yaml`)
 
-Locate **`config.yaml`** in the project root and configure your preferred model API.
+Locate **`configs.yaml`** in the project root and configure your preferred model API.
+This project has been simplified to **SiliconFlow only** as the OCR/Chat API provider.
 
 #### Example: SiliconFlow
 
@@ -168,17 +169,15 @@ gpt-api:
   api_name: Siliconflow
   base_url: https://api.siliconflow.cn/v1
   model_name: Pro/Qwen/Qwen2.5-VL-7B-Instruct
+
+chat-api:
+  api_key: sk-cxr******
+  api_name: Siliconflow
+  base_url: https://api.siliconflow.cn/v1
+  model_name: Qwen/Qwen2.5-VL-32B-Instruct
 ```
 
-#### Example: Google Gemini
-
-```yaml
-gpt-api:
-  api_key: ["AIzaSyB***", "AIza***", "AIzaS***"]
-  api_name: google
-  base_url: https://generativelanguage.googleapis.com
-  model_name: models/gemini-2.0-flash
-```
+For model names, pick one from [支持模型.md](file:///f:/ysh_loc_office/projects/practice/TextSnap/flask_react/testsnap-react/支持模型.md) in the frontend folder.
 
 ---
 
@@ -227,7 +226,7 @@ TextSnap/
 
 ## ⚛️ React Frontend (Optional)
 
-### 1️⃣ Verify Node Environment (≥ 18)
+### 1️⃣ Verify Node Environment (recommended ≥ 20.19 or ≥ 22.12)
 
 ```bash
 node -v
@@ -269,6 +268,10 @@ flask_react/testsnap-react/src/constants/apiConfig.js
 ```
 
 ![](https://pic1.imgdb.cn/item/69465b8329a616e52860e904.png)
+
+Model configuration notes:
+- The “Model Config” panel is simplified to Base URL / API Key / Model Name (dropdown)
+- Provider is fixed to SiliconFlow; Google is no longer supported
 
 ---
 

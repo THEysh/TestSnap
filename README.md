@@ -154,7 +154,8 @@ data/models/
 
 ### 5️⃣ 配置大模型 API（`config.yaml`）
 
-在项目根目录找到 **`config.yaml`**，填写 VLM / LLM 相关配置。
+在项目根目录找到 **`configs.yaml`**，填写 VLM / LLM 相关配置。
+当前项目已调整为 **仅支持硅基流动（SiliconFlow）** 作为 OCR/Chat 的 API 提供方。
 
 #### 示例一：硅基流动（SiliconFlow）
 
@@ -164,17 +165,15 @@ gpt-api:
   api_name: Siliconflow
   base_url: https://api.siliconflow.cn/v1
   model_name: Pro/Qwen/Qwen2.5-VL-7B-Instruct
+
+chat-api:
+  api_key: sk-cxr******
+  api_name: Siliconflow
+  base_url: https://api.siliconflow.cn/v1
+  model_name: Qwen/Qwen2.5-VL-32B-Instruct
 ```
 
-#### 示例二：Google Gemini
-
-```yaml
-gpt-api:
-  api_key: ["AIzaSyB***", "AIza***", "AIzaS***"]
-  api_name: google
-  base_url: https://generativelanguage.googleapis.com
-  model_name: models/gemini-2.0-flash
-```
+模型名称建议从前端项目中的 [支持模型.md](file:///f:/ysh_loc_office/projects/practice/TextSnap/flask_react/testsnap-react/支持模型.md) 选择。
 
 ---
 
@@ -223,7 +222,7 @@ TextSnap/
 
 ## ⚛️ React 前端启动（可选）
 
-### 1️⃣ 确认 Node 环境（≥ 18）
+### 1️⃣ 确认 Node 环境（推荐 ≥ 20.19 或 ≥ 22.12）
 
 ```bash
 node -v
@@ -265,6 +264,10 @@ flask_react/testsnap-react/src/constants/apiConfig.js
 ```
 
 ![](https://pic1.imgdb.cn/item/69465b8329a616e52860e904.png)
+
+模型配置说明：
+- 前端页面「模型配置」已简化为：Base URL / API Key / Model Name（下拉选择）
+- API 提供方固定为 SiliconFlow，不再支持 Google
 
 ---
 
