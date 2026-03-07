@@ -596,17 +596,15 @@
 }
 
 .lcModelMenu {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(100% + 8px);
-  top: auto;
-  z-index: 60;
+  position: fixed;
+  z-index: 72;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(7, 10, 18, 0.92);
   box-shadow: 0 22px 70px rgba(0, 0, 0, 0.6);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .lcModelMenuTop {
@@ -631,7 +629,7 @@
 }
 
 .lcModelList {
-  max-height: min(56vh, 520px);
+  flex: 1;
   overflow: auto;
   padding: 8px 8px;
   display: flex;

@@ -26,8 +26,45 @@ export default function MessageComposer({
 
   const [modelOpen, setModelOpen] = useState(false);
   const [modelQuery, setModelQuery] = useState('');
+  const [modelOpenUp, setModelOpenUp] = useState(false);
+  const [modelMenuStyle, setModelMenuStyle] = useState(null);
   const modelWrapRef = useRef(null);
   const modelSearchRef = useRef(null);
+
+  useEffect(() => {
+    if (!modelOpen) return;
+    const update = () => {
+      const root = modelWrapRef.current;
+      const btn = root?.querySelector?.('button');
+      if (!btn || typeof window === 'undefined') return;
+      const rect = btn.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const openUp = spaceBelow < 320 && spaceAbove > spaceBelow;
+      setModelOpenUp(openUp);
+      const maxHeight = Math.max(220, Math.min(520, (openUp ? spaceAbove : spaceBelow) - 16));
+      const next = {
+        left: Math.max(8, rect.left),
+        width: Math.min(rect.width, window.innerWidth - 16),
+        maxHeight
+      };
+      if (openUp) {
+        next.bottom = Math.max(8, window.innerHeight - rect.top + 8);
+        next.top = 'auto';
+      } else {
+        next.top = Math.max(8, rect.bottom + 8);
+        next.bottom = 'auto';
+      }
+      setModelMenuStyle(next);
+    };
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [modelOpen]);
 
   useEffect(() => {
     if (!modelOpen) return;
@@ -87,7 +124,12 @@ export default function MessageComposer({
             <span className={modelOpen ? 'lcModelCaret is-open' : 'lcModelCaret'} aria-hidden="true" />
           </button>
           {modelOpen && (
-            <div className="lcModelMenu" role="listbox" aria-label="模型列表">
+            <div
+              className={modelOpenUp ? 'lcModelMenu is-up' : 'lcModelMenu'}
+              role="listbox"
+              aria-label="模型列表"
+              style={modelMenuStyle || undefined}
+            >
               <div className="lcModelMenuTop">
                 <input
                   ref={modelSearchRef}
