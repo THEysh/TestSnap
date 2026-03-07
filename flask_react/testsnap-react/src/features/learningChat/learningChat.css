@@ -1,0 +1,1092 @@
+.lcLayout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.lcSidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lcPanel {
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  padding: 14px 14px;
+}
+
+.lcPanelTitle {
+  font-weight: 900;
+  letter-spacing: -0.1px;
+  margin-bottom: 12px;
+}
+
+.lcEmpty {
+  color: rgba(255, 255, 255, 0.62);
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.lcEmpty a {
+  color: rgba(200, 205, 255, 0.95);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.lcEmpty a:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.lcTaskList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lcTask {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: stretch;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.18);
+  padding: 10px 10px;
+}
+
+.lcTask.is-active {
+  border-color: rgba(109, 124, 255, 0.55);
+}
+
+.lcTaskMain {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.9);
+  text-align: left;
+  cursor: pointer;
+  padding: 0 52px 0 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.lcTaskName {
+  font-weight: 900;
+  font-size: 13px;
+}
+
+.lcTaskDesc {
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.lcTaskDone {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translate(120%, -50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.22s ease, opacity 0.22s ease;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.86);
+  font-weight: 900;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lcTask:hover .lcTaskDone,
+.lcTask:focus-within .lcTaskDone,
+.lcTask.is-active .lcTaskDone {
+  transform: translate(0, -50%);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.lcTaskDone:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.lcTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.lcPersonaPicker {
+  position: relative;
+}
+
+.lcPersonaBtn {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.22);
+  color: rgba(255, 255, 255, 0.92);
+  padding: 10px 12px;
+  outline: none;
+  font-weight: 900;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lcPersonaBtnText {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.lcPersonaCaret {
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid rgba(255, 255, 255, 0.75);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.75);
+  transform: rotate(45deg);
+  opacity: 0.8;
+  transition: transform 0.18s ease;
+}
+
+.lcPersonaCaret.is-open {
+  transform: rotate(225deg);
+}
+
+.lcPersonaDesc {
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.lcPersonaMenu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 40;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(7, 10, 18, 0.92);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.lcPersonaMenu.is-up {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+
+.lcPersonaMenuTop {
+  padding: 10px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.lcPersonaSearch {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.22);
+  color: rgba(255, 255, 255, 0.92);
+  padding: 10px 12px;
+  outline: none;
+  font-weight: 800;
+}
+
+.lcPersonaSearch:focus {
+  border-color: rgba(109, 124, 255, 0.7);
+}
+
+.lcPersonaList {
+  max-height: min(56vh, 520px);
+  overflow: auto;
+  padding: 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lcPersonaItem {
+  text-align: left;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 900;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.lcPersonaItem:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.lcPersonaItem.is-active {
+  border: none;
+  background: linear-gradient(135deg, rgba(109, 124, 255, 0.9), rgba(155, 107, 255, 0.9));
+  box-shadow: 0 16px 38px rgba(109, 124, 255, 0.18);
+}
+
+.lcPersonaItemTitle {
+  font-weight: 900;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.lcPersonaItemDesc {
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.lcPersonaEmpty {
+  padding: 10px 12px;
+  color: rgba(255, 255, 255, 0.68);
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.lcTag {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.86);
+  font-weight: 900;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+
+.lcTag:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.lcTag.is-active {
+  border: none;
+  background: linear-gradient(135deg, rgba(109, 124, 255, 0.9), rgba(155, 107, 255, 0.9));
+  box-shadow: 0 16px 38px rgba(109, 124, 255, 0.18);
+}
+
+.lcCardList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lcMiniCard {
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.18);
+  padding: 12px 12px;
+  text-align: left;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.9);
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+
+.lcMiniCard:hover {
+  transform: translateY(-1px);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.lcMiniCardTitle {
+  font-weight: 900;
+}
+
+.lcMiniCardMeta {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.lcMain {
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 72vh;
+}
+
+.lcDocBar {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.lcDocBarTitle {
+  font-weight: 900;
+}
+
+.lcDocBarMeta {
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.lcDocHint {
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.lcThread {
+  flex: 1;
+  overflow: auto;
+  padding: 14px 14px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lcMsg {
+  display: flex;
+}
+
+.lcMsgUser {
+  justify-content: flex-end;
+}
+
+.lcMsgAi {
+  justify-content: flex-start;
+}
+
+.lcBubble {
+  max-width: 820px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.18);
+  padding: 12px 12px;
+  position: relative;
+}
+
+.lcMsgUser .lcBubble {
+  background: linear-gradient(135deg, rgba(109, 124, 255, 0.35), rgba(155, 107, 255, 0.28));
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.lcPlain {
+  white-space: pre-wrap;
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 800;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.lcMarkdown {
+  color: rgba(255, 255, 255, 0.9);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.lcMarkdown :is(p, li) {
+  color: rgba(255, 255, 255, 0.88);
+  line-height: 1.6;
+}
+
+.lcMarkdown a {
+  color: rgba(200, 205, 255, 0.95);
+}
+
+.lcMarkdown pre {
+  background: rgba(0, 0, 0, 0.26);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 10px 10px;
+  overflow: auto;
+}
+
+.lcMarkdown :is(ul, ol) {
+  padding-left: 18px;
+  margin: 10px 0;
+}
+
+.lcMarkdown li {
+  margin: 6px 0;
+}
+
+.lcMsgActions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease;
+}
+
+.lcMsg:hover .lcMsgActions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.lcActionBtn {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(7, 10, 18, 0.72);
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 900;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lcActionBtn:hover {
+  background: rgba(7, 10, 18, 0.86);
+}
+
+.lcReasoning {
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.lcReasoningSummary {
+  cursor: pointer;
+  padding: 10px 12px;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.88);
+  list-style: none;
+}
+
+.lcReasoningSummary::-webkit-details-marker {
+  display: none;
+}
+
+.lcReasoningSummary::after {
+  content: '›';
+  float: right;
+  opacity: 0.75;
+  transform: rotate(90deg);
+  transition: transform 0.18s ease;
+}
+
+.lcReasoning[open] .lcReasoningSummary::after {
+  transform: rotate(-90deg);
+}
+
+.lcReasoningBody {
+  margin: 0;
+  padding: 10px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  white-space: pre-wrap;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.55;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.lcComposer {
+  padding: 12px 14px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.lcSidebarBtn {
+  display: none;
+}
+
+.lcContextRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.lcModelRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.lcModelLabel {
+  color: rgba(255, 255, 255, 0.62);
+  font-weight: 900;
+  font-size: 12px;
+}
+
+.lcModelPicker {
+  position: relative;
+  flex: 1;
+  min-width: 260px;
+}
+
+.lcModelBtn {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.22);
+  color: rgba(255, 255, 255, 0.92);
+  padding: 10px 12px;
+  outline: none;
+  font-weight: 900;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lcModelBtn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.lcModelBtnText {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.lcModelCaret {
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid rgba(255, 255, 255, 0.75);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.75);
+  transform: rotate(45deg);
+  opacity: 0.8;
+  transition: transform 0.18s ease;
+}
+
+.lcModelCaret.is-open {
+  transform: rotate(225deg);
+}
+
+.lcModelMenu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 8px);
+  top: auto;
+  z-index: 60;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(7, 10, 18, 0.92);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.lcModelMenuTop {
+  padding: 10px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.lcModelSearch {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.22);
+  color: rgba(255, 255, 255, 0.92);
+  padding: 10px 12px;
+  outline: none;
+  font-weight: 800;
+}
+
+.lcModelSearch:focus {
+  border-color: rgba(109, 124, 255, 0.7);
+}
+
+.lcModelList {
+  max-height: min(56vh, 520px);
+  overflow: auto;
+  padding: 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lcModelItem {
+  text-align: left;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 900;
+  padding: 10px 12px;
+  cursor: pointer;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.35;
+}
+
+.lcModelItem:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.lcModelItem.is-active {
+  border: none;
+  background: linear-gradient(135deg, rgba(109, 124, 255, 0.9), rgba(155, 107, 255, 0.9));
+  box-shadow: 0 16px 38px rgba(109, 124, 255, 0.18);
+}
+
+.lcModelEmpty {
+  padding: 10px 12px;
+  color: rgba(255, 255, 255, 0.68);
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.lcThinkToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 8px 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.lcThinkToggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.lcThinkToggle.is-disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.lcSwitch {
+  width: 34px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.22);
+  position: relative;
+}
+
+.lcSwitch::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  transform: translate(0, -50%);
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+
+.lcThinkToggle input:checked + .lcSwitch {
+  border: none;
+  background: linear-gradient(135deg, rgba(109, 124, 255, 0.9), rgba(155, 107, 255, 0.9));
+  box-shadow: 0 16px 38px rgba(109, 124, 255, 0.14);
+}
+
+.lcThinkToggle input:checked + .lcSwitch::after {
+  transform: translate(16px, -50%);
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.lcThinkText {
+  color: rgba(255, 255, 255, 0.86);
+  font-weight: 900;
+  font-size: 12px;
+}
+
+.lcHint {
+  color: rgba(255, 255, 255, 0.62);
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.lcChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.lcChipText {
+  font-weight: 900;
+  font-size: 12px;
+}
+
+.lcChipX {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.86);
+  cursor: pointer;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.lcInputRow {
+  display: flex;
+  gap: 10px;
+}
+
+.lcTextarea {
+  width: 100%;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.22);
+  color: rgba(255, 255, 255, 0.92);
+  padding: 12px 12px;
+  outline: none;
+  resize: vertical;
+}
+
+.lcTextarea:focus {
+  border-color: rgba(109, 124, 255, 0.7);
+}
+
+.lcActions {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.lcBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform 0.18s ease, opacity 0.18s ease, background 0.18s ease;
+}
+
+.lcBtn:hover {
+  transform: translateY(-1px);
+}
+
+.lcBtn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.lcBtnPrimary {
+  border: none;
+  color: rgba(255, 255, 255, 0.95);
+  background: linear-gradient(135deg, #6d7cff, #9b6bff);
+  box-shadow: 0 16px 38px rgba(109, 124, 255, 0.22);
+}
+
+.lcBtnGhost {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.lcBtnStop {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.9);
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.lcStopIcon {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.86);
+  display: inline-block;
+}
+
+.lcBtnStop:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.lcFile {
+  display: none;
+}
+
+.lcError {
+  margin-top: 10px;
+  border: 1px solid rgba(255, 120, 120, 0.28);
+  background: rgba(255, 120, 120, 0.1);
+  color: rgba(255, 210, 210, 0.92);
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.lcUploadMeta {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.lcOk {
+  color: rgba(200, 255, 220, 0.92);
+}
+
+.lcModalMask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 18px;
+  z-index: 50;
+}
+
+.lcModal {
+  width: min(980px, 100%);
+  max-height: min(86vh, 920px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(7, 10, 18, 0.92);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.lcModalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.lcModalTitle {
+  font-weight: 900;
+  letter-spacing: -0.1px;
+}
+
+.lcModalX {
+  width: 26px;
+  height: 26px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.lcModalBody {
+  padding: 12px 14px;
+  overflow: auto;
+}
+
+.lcModalActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.lcConfirmMask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 18px;
+  z-index: 70;
+}
+
+.lcConfirm {
+  width: min(520px, 100%);
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(7, 10, 18, 0.92);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.6);
+  padding: 14px 14px;
+}
+
+.lcConfirmTitle {
+  font-weight: 900;
+}
+
+.lcConfirmDesc {
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 800;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.lcConfirmActions {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.lcToast {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 75;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(7, 10, 18, 0.92);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  padding: 10px 12px;
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 900;
+  font-size: 13px;
+}
+
+.lcDrawerMask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 14px 14px;
+  z-index: 80;
+}
+
+.lcDrawer {
+  width: min(980px, 100%);
+  max-height: min(84vh, 920px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(7, 10, 18, 0.92);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.lcDrawerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.lcDrawerTitle {
+  font-weight: 900;
+  letter-spacing: -0.1px;
+}
+
+.lcDrawerX {
+  width: 26px;
+  height: 26px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.lcDrawerBody {
+  padding: 12px 14px;
+  overflow: auto;
+}
+
+.lcDrawerBody .lcSidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lcDrawerBody .lcPanel {
+  padding: 12px 12px;
+}
+
+@media (max-width: 980px) {
+  .lcLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .lcLayout > .lcSidebar {
+    display: none;
+  }
+
+  .lcSidebarBtn {
+    display: inline-flex;
+  }
+
+  .lcComposer {
+    position: sticky;
+    bottom: 0;
+    z-index: 55;
+    backdrop-filter: blur(10px);
+  }
+}

@@ -1,0 +1,155 @@
+.appShell {
+  min-height: 100vh;
+  background: radial-gradient(900px 600px at 20% 10%, rgba(109, 124, 255, 0.22), transparent 60%),
+    radial-gradient(900px 600px at 85% 15%, rgba(155, 107, 255, 0.2), transparent 55%),
+    #070a12;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.appNav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(7, 10, 18, 0.72);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.appNavInner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.appBrand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 900;
+  letter-spacing: 0.2px;
+}
+
+.appBrandDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #6d7cff, #9b6bff);
+  box-shadow: 0 10px 26px rgba(109, 124, 255, 0.35);
+}
+
+.appNavLinks {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.appNavLink {
+  color: rgba(255, 255, 255, 0.78);
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 8px 10px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 13px;
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+
+.appNavLink:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.appNavRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.appUser {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 14px;
+  padding: 8px 10px;
+}
+
+.appAvatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(109, 124, 255, 0.9), rgba(155, 107, 255, 0.9));
+  font-weight: 900;
+  letter-spacing: 0.5px;
+}
+
+.appUserMeta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.appUserName {
+  font-weight: 900;
+  font-size: 13px;
+}
+
+.appUserSub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.appNavBtn {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 800;
+  border-radius: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+
+.appNavBtn:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.appMain {
+  padding: 22px 18px 60px;
+}
+
+.appMainInner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.appTitle {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.2px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 860px) {
+  .appNavInner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .appNavRight {
+    justify-content: space-between;
+  }
+}
+

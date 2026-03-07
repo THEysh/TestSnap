@@ -16,6 +16,11 @@ body {
   display: block;
 }
 
+body.marketing-mode {
+  padding: 0;
+  background: #070a12;
+}
+
 .container {
   width: 100%;
   max-width: 1400px;
@@ -25,6 +30,111 @@ body {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
   overflow: hidden;
   min-height: calc(100vh - 40px);
+}
+
+.demo-embed {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 0;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  min-height: 100vh;
+}
+
+.marketing-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 56px 20px;
+  background: radial-gradient(900px 600px at 20% 10%, rgba(109, 124, 255, 0.26), transparent 60%),
+    radial-gradient(900px 600px at 85% 15%, rgba(155, 107, 255, 0.22), transparent 55%),
+    #070a12;
+}
+
+.marketing-card {
+  width: 100%;
+  max-width: 720px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.92);
+  padding: 20px 18px;
+}
+
+.marketing-cardHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.marketing-badge {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.2px;
+}
+
+.marketing-title {
+  font-size: 28px;
+  line-height: 1.15;
+}
+
+.marketing-subtitle {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.marketing-body {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.marketing-actions {
+  margin-top: 18px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.marketing-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px;
+  border-radius: 12px;
+  text-decoration: none;
+  font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.06);
+  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+
+.marketing-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.marketing-btnPrimary {
+  border: none;
+  background: linear-gradient(135deg, #6d7cff, #9b6bff);
+  box-shadow: 0 16px 38px rgba(109,124,255,0.28);
+}
+
+.marketing-btnGhost {
+  background: rgba(255, 255, 255, 0.04);
 }
 
 /* PDF容器样式 */

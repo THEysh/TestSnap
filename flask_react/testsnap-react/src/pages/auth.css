@@ -1,0 +1,168 @@
+.authShell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 56px 20px;
+  background: radial-gradient(900px 600px at 20% 10%, rgba(109, 124, 255, 0.26), transparent 60%),
+    radial-gradient(900px 600px at 85% 15%, rgba(155, 107, 255, 0.22), transparent 55%),
+    #070a12;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.authCard {
+  width: 100%;
+  max-width: 520px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  padding: 18px 18px;
+}
+
+.authBrand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 900;
+  letter-spacing: 0.2px;
+}
+
+.authDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #6d7cff, #9b6bff);
+  box-shadow: 0 10px 26px rgba(109, 124, 255, 0.35);
+}
+
+.authHeader {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.authTitle {
+  font-size: 28px;
+  line-height: 1.15;
+}
+
+.authSubtitle {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 14px;
+}
+
+.authTabs {
+  margin-top: 14px;
+  display: flex;
+  gap: 10px;
+}
+
+.authTab {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.86);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.authTab.is-active {
+  border: none;
+  background: linear-gradient(135deg, rgba(109, 124, 255, 0.92), rgba(155, 107, 255, 0.92));
+  box-shadow: 0 16px 38px rgba(109, 124, 255, 0.18);
+}
+
+.authForm {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.authField {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.authLabel {
+  font-weight: 900;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.authInput {
+  width: 100%;
+  padding: 12px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.22);
+  color: rgba(255, 255, 255, 0.92);
+  outline: none;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.authInput:focus {
+  border-color: rgba(109, 124, 255, 0.7);
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.authError {
+  border: 1px solid rgba(255, 120, 120, 0.28);
+  background: rgba(255, 120, 120, 0.1);
+  color: rgba(255, 210, 210, 0.92);
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.authSubmit {
+  margin-top: 6px;
+  padding: 12px 12px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.95);
+  background: linear-gradient(135deg, #6d7cff, #9b6bff);
+  box-shadow: 0 16px 38px rgba(109, 124, 255, 0.22);
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+
+.authSubmit:hover {
+  transform: translateY(-1px);
+}
+
+.authSubmit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.authFooter {
+  margin-top: 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.authLink {
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 13px;
+  border-bottom: 1px solid transparent;
+}
+
+.authLink:hover {
+  color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+

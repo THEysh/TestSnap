@@ -1,0 +1,377 @@
+.libLayout {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.libTop {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.libSearch {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.libInput {
+  width: min(520px, 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.22);
+  color: rgba(255, 255, 255, 0.92);
+  padding: 12px 12px;
+  outline: none;
+}
+
+.libInput:focus {
+  border-color: rgba(109, 124, 255, 0.7);
+}
+
+.libCount {
+  color: rgba(255, 255, 255, 0.68);
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.libActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.libSelMeta {
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 900;
+  font-size: 12px;
+}
+
+.libBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-weight: 900;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.18s ease, opacity 0.18s ease, background 0.18s ease;
+}
+
+.libBtn:hover {
+  transform: translateY(-1px);
+}
+
+.libBtn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.libBtnPrimary {
+  border: none;
+  color: rgba(255, 255, 255, 0.95);
+  background: linear-gradient(135deg, #6d7cff, #9b6bff);
+  box-shadow: 0 16px 38px rgba(109, 124, 255, 0.22);
+}
+
+.libBtnGhost {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.libBtnDanger {
+  border: 1px solid rgba(255, 120, 120, 0.28);
+  background: rgba(255, 120, 120, 0.12);
+  color: rgba(255, 230, 230, 0.92);
+}
+
+.libGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.libCard {
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  padding: 12px 12px;
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.libCard.is-selected {
+  border-color: rgba(109, 124, 255, 0.55);
+  box-shadow: 0 18px 50px rgba(109, 124, 255, 0.12);
+}
+
+.libCheck {
+  padding-top: 4px;
+}
+
+.libCheck input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}
+
+.libCardMain {
+  grid-column: 1 / -1;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+}
+
+.libCard.is-selecting .libCardMain {
+  grid-column: 2 / -1;
+}
+
+.libCardTitle {
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.libCardMeta {
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.66);
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.libCardActions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.libCard.is-selecting .libCardActions {
+  grid-column: 2 / -1;
+}
+
+.libCardBtn {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 900;
+  cursor: pointer;
+  padding: 8px 10px;
+}
+
+.libCardBtn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.libCardBtnPrimary {
+  border: none;
+  color: rgba(255, 255, 255, 0.95);
+  background: linear-gradient(135deg, rgba(109, 124, 255, 0.92), rgba(155, 107, 255, 0.92));
+  box-shadow: 0 14px 32px rgba(109, 124, 255, 0.18);
+}
+
+.libCardBtnDanger {
+  border: 1px solid rgba(255, 120, 120, 0.28);
+  background: rgba(255, 120, 120, 0.12);
+  color: rgba(255, 230, 230, 0.92);
+}
+
+.libEmpty {
+  color: rgba(255, 255, 255, 0.68);
+  font-weight: 800;
+  font-size: 13px;
+  padding: 14px 2px;
+}
+
+.libEmpty a {
+  color: rgba(200, 205, 255, 0.95);
+}
+
+.libModalMask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 18px;
+  z-index: 80;
+}
+
+.libModal {
+  width: min(980px, 100%);
+  max-height: min(86vh, 920px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(7, 10, 18, 0.92);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.libModalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.libModalTitle {
+  font-weight: 900;
+  letter-spacing: -0.1px;
+}
+
+.libModalX {
+  width: 26px;
+  height: 26px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.libModalBody {
+  padding: 12px 14px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.libModalActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.libFormRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.libFormLabel {
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 900;
+  font-size: 12px;
+}
+
+.libFormInput {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.22);
+  color: rgba(255, 255, 255, 0.92);
+  padding: 10px 12px;
+  outline: none;
+  font-weight: 800;
+}
+
+.libFormInput:focus {
+  border-color: rgba(109, 124, 255, 0.7);
+}
+
+.libFormTextarea {
+  width: 100%;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.22);
+  color: rgba(255, 255, 255, 0.92);
+  padding: 12px 12px;
+  outline: none;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  line-height: 1.55;
+}
+
+.libFormTextarea:focus {
+  border-color: rgba(109, 124, 255, 0.7);
+}
+
+.libConfirmMask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 18px;
+  z-index: 90;
+}
+
+.libConfirm {
+  width: min(520px, 100%);
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(7, 10, 18, 0.92);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.6);
+  padding: 14px 14px;
+}
+
+.libConfirmTitle {
+  font-weight: 900;
+}
+
+.libConfirmDesc {
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 800;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.libConfirmActions {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.libToast {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 95;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(7, 10, 18, 0.92);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  padding: 10px 12px;
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 900;
+  font-size: 13px;
+}
+
+@media (max-width: 980px) {
+  .libGrid {
+    grid-template-columns: 1fr;
+  }
+}

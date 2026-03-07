@@ -46,7 +46,9 @@ const useMarkdownRenderer = () => {
         console.log('MathJax渲染错误: ', err);
       });
     }
-    enhanceBlocks(previewRef.current);
+    if (isDemoRoute()) {
+      enhanceBlocks(previewRef.current);
+    }
   };
 
   // 创建防抖版本的渲染函数
@@ -72,10 +74,19 @@ const useMarkdownRenderer = () => {
 
 const LAUNCHER_ID = 'textsnap_chat_launcher';
 
+function isDemoRoute() {
+  try {
+    const hash = typeof window !== 'undefined' ? (window.location.hash || '') : '';
+    return hash.startsWith('#/demo');
+  } catch {
+    return false;
+  }
+}
+
 function getChatUrl() {
   return (typeof window !== 'undefined')
-    ? (window.location.origin + window.location.pathname + '#/chat?new=1')
-    : '#/chat?new=1';
+    ? (window.location.origin + window.location.pathname + '#/demo/chat?new=1')
+    : '#/demo/chat?new=1';
 }
 
 function openChatWindow() {
@@ -137,6 +148,14 @@ function ensureChatLauncher() {
 
 function updateChatLauncher() {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  const hash = window.location.hash || '';
+  const show = hash.startsWith('#/demo') && !hash.startsWith('#/demo/chat');
+  if (!show) {
+    const existing = document.getElementById(LAUNCHER_ID);
+    if (existing) existing.style.display = 'none';
+    return;
+  }
+
   const el = ensureChatLauncher();
   if (!el) return;
 
@@ -169,13 +188,12 @@ function updateChatLauncher() {
     }
   }
 
-  const hash = window.location.hash || '';
-  const show = !hash.startsWith('#/chat');
   el.style.display = show ? 'flex' : 'none';
   el.classList.toggle('is-idle', displayCount === 0);
 }
 
 function enhanceBlocks(root) {
+  if (!isDemoRoute()) return;
   if (!root) return;
   const nodes = root.querySelectorAll('.md-block');
   nodes.forEach((node) => {
@@ -201,7 +219,7 @@ function enhanceBlocks(root) {
       enqueueBlock(payload);
       updateChatLauncher();
       const hash = typeof window !== 'undefined' ? (window.location.hash || '') : '';
-      if (!hash.startsWith('#/chat')) {
+      if (hash.startsWith('#/demo') && !hash.startsWith('#/demo/chat')) {
         let autoOpen = true;
         try {
           autoOpen = !!getChatAutoOpen();

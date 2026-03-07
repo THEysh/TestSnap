@@ -1,17 +1,67 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { processFile, getTaskProgress } from '../services/apiService';
 import { ENDPOINTS } from '../constants/apiConfig';
 
-const useFileProcess = () => {
-  const [status, setStatus] = useState('idle');
-  const [progress, setProgress] = useState(0);
-  const [progressMessage, setProgressMessage] = useState('');
-  const [processedFileUrl, setProcessedFileUrl] = useState(null);
-  const [downloadLink, setDownloadLink] = useState(null);
-  const [autoLoadMarkdownPath, setAutoLoadMarkdownPath] = useState(null);
-  const [error, setError] = useState(null);
-  const [taskId, setTaskId] = useState(null);
-  const [streamContent, setStreamContent] = useState('');
+function safeJsonParse(value, fallback) {
+  try {
+    const parsed = JSON.parse(value);
+    return parsed ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function readPersisted(key) {
+  if (typeof window === 'undefined') return null;
+  if (!key) return null;
+  const raw = window.localStorage.getItem(key);
+  const data = safeJsonParse(raw, null);
+  if (!data || typeof data !== 'object') return null;
+  const ts = Number(data.ts || 0);
+  if (!ts) return null;
+  if (Date.now() - ts > 24 * 60 * 60 * 1000) return null;
+  return data;
+}
+
+const useFileProcess = ({ persistKey } = {}) => {
+  const persisted = useMemo(() => readPersisted(persistKey), [persistKey]);
+
+  const [status, setStatus] = useState(() => persisted?.status || 'idle');
+  const [progress, setProgress] = useState(() => Number(persisted?.progress || 0));
+  const [progressMessage, setProgressMessage] = useState(() => persisted?.progressMessage || '');
+  const [processedFileUrl, setProcessedFileUrl] = useState(() => persisted?.processedFileUrl || null);
+  const [downloadLink, setDownloadLink] = useState(() => persisted?.downloadLink || null);
+  const [autoLoadMarkdownPath, setAutoLoadMarkdownPath] = useState(() => persisted?.autoLoadMarkdownPath || null);
+  const [error, setError] = useState(() => persisted?.error || null);
+  const [taskId, setTaskId] = useState(() => persisted?.taskId || null);
+  const [streamContent, setStreamContent] = useState(() => persisted?.streamContent || '');
+
+  const persistTimerRef = useRef(null);
+
+  const writePersisted = useCallback((data) => {
+    if (typeof window === 'undefined') return;
+    if (!persistKey) return;
+    if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    persistTimerRef.current = setTimeout(() => {
+      try {
+        window.localStorage.setItem(persistKey, JSON.stringify({ ...data, ts: Date.now() }));
+      } catch {
+        void 0;
+      } finally {
+        persistTimerRef.current = null;
+      }
+    }, 120);
+  }, [persistKey]);
+
+  const clearPersisted = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    if (!persistKey) return;
+    try {
+      window.localStorage.removeItem(persistKey);
+    } catch {
+      void 0;
+    }
+  }, [persistKey]);
 
   const process = async (filename, isPdf) => {
     setStatus('processing');
@@ -37,6 +87,40 @@ const useFileProcess = () => {
       return { success: false, error: err.message };
     }
   };
+
+  useEffect(() => {
+    if (!persistKey) return;
+    writePersisted({
+      status,
+      progress,
+      progressMessage,
+      processedFileUrl,
+      downloadLink,
+      autoLoadMarkdownPath,
+      error,
+      taskId,
+      streamContent
+    });
+    return () => void 0;
+  }, [
+    persistKey,
+    writePersisted,
+    status,
+    progress,
+    progressMessage,
+    processedFileUrl,
+    downloadLink,
+    autoLoadMarkdownPath,
+    error,
+    taskId,
+    streamContent
+  ]);
+
+  useEffect(() => {
+    return () => {
+      if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    };
+  }, []);
 
   // 轮询任务进度
   useEffect(() => {
@@ -181,6 +265,7 @@ const useFileProcess = () => {
       setError(null);
       setTaskId(null);
       setStreamContent('');
+      clearPersisted();
     }
   };
 };
