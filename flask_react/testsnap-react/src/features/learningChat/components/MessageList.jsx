@@ -25,7 +25,7 @@ function copyToClipboard(text) {
   }
 }
 
-export default function MessageList({ messages, streaming }) {
+export default function MessageList({ messages, streaming, onGenerateCard }) {
   const endRef = useRef(null);
   const [copiedId, setCopiedId] = useState('');
   const copiedTimerRef = useRef(null);
@@ -63,6 +63,16 @@ export default function MessageList({ messages, streaming }) {
               >
                 {copiedId === m.id ? '已复制' : '复制'}
               </button>
+              {m.role === 'assistant' && !!String(m.content || '').trim() && typeof onGenerateCard === 'function' && (
+                <button
+                  type="button"
+                  className="lcActionBtn"
+                  title="根据当前对话生成学习卡片"
+                  onClick={() => onGenerateCard(m.id)}
+                >
+                  生成学习卡片
+                </button>
+              )}
             </div>
             {m.role === 'assistant' ? (
               <div className="lcMarkdown">

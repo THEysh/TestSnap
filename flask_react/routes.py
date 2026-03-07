@@ -12,6 +12,7 @@ from flask_react.services import safe_resolve_under_root
 
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
+generate_bp = Blueprint("generate", __name__)
 
 
 def _get_services() -> tuple[Any, Any, Any, Any]:
@@ -20,6 +21,49 @@ def _get_services() -> tuple[Any, Any, Any, Any]:
     markdown_service = current_app.extensions["markdown_service"]
     chat_service = current_app.extensions["chat_service"]
     return worker, file_service, markdown_service, chat_service
+
+
+def _build_chat_text(messages: Any, chat: Any) -> str:
+    if isinstance(chat, str) and chat.strip():
+        return chat.strip()
+    if not isinstance(messages, list):
+        return ""
+    parts: list[str] = []
+    for m in messages:
+        if not isinstance(m, dict):
+            continue
+        role = str(m.get("role") or "")
+        content = m.get("content")
+        if isinstance(content, list):
+            txt_parts: list[str] = []
+            for it in content:
+                if isinstance(it, str) and it.strip():
+                    txt_parts.append(it.strip())
+                if isinstance(it, dict) and it.get("type") == "text":
+                    t = it.get("text") or it.get("content") or ""
+                    if isinstance(t, str) and t.strip():
+                        txt_parts.append(t.strip())
+            content_str = "\n".join(txt_parts)
+        else:
+            content_str = str(content or "")
+        content_str = content_str.strip()
+        if not content_str:
+            continue
+        label = "用户" if role == "user" else "AI" if role == "assistant" else role or "消息"
+        parts.append(f"{label}：{content_str}")
+    return "\n\n".join(parts).strip()
+
+
+def _handle_generate_card(data: dict[str, Any]):
+    messages = data.get("messages")
+    chat = data.get("chat")
+    chat_text = _build_chat_text(messages, chat)
+    if not chat_text:
+        return jsonify({"success": False, "error": "messages 或 chat 不能为空"}), 400
+    model_name = data.get("model_name", None)
+    chat_service = _get_services()[3]
+    result = chat_service.generate_card(chat_text, model_name)
+    return jsonify(result), 200 if result.get("success") else 500
 
 
 @api_bp.get("/task/progress/<task_id>")
@@ -315,4 +359,72 @@ def api_chat_cancel():
         return jsonify({"success": True}), 200
     except Exception as e:
         logger.error(f"/api/chat/cancel 失败: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@api_bp.post("/generate_card")
+def api_generate_card():
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        return _handle_generate_card(data)
+    except Exception as e:
+        logger.error(f"/api/generate_card 失败: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@generate_bp.post("/generate_card")
+def root_generate_card():
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        return _handle_generate_card(data)
+    except Exception as e:
+        logger.error(f"/generate_card 失败: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@api_bp.post("/generate_card/stream")
+def api_generate_card_stream():
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        messages = data.get("messages")
+        chat = data.get("chat")
+        chat_text = _build_chat_text(messages, chat)
+        if not chat_text:
+            return jsonify({"success": False, "error": "messages 或 chat 不能为空"}), 400
+        model_name = data.get("model_name", None)
+        chat_service = _get_services()[3]
+        resp = Response(
+            chat_service.stream_generate_card_markdown(chat_text, model_name),
+            mimetype="text/event-stream",
+        )
+        resp.headers["Cache-Control"] = "no-cache"
+        resp.headers["Connection"] = "keep-alive"
+        resp.headers["X-Accel-Buffering"] = "no"
+        return resp
+    except Exception as e:
+        logger.error(f"/api/generate_card/stream 失败: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@generate_bp.post("/generate_card/stream")
+def root_generate_card_stream():
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        messages = data.get("messages")
+        chat = data.get("chat")
+        chat_text = _build_chat_text(messages, chat)
+        if not chat_text:
+            return jsonify({"success": False, "error": "messages 或 chat 不能为空"}), 400
+        model_name = data.get("model_name", None)
+        chat_service = _get_services()[3]
+        resp = Response(
+            chat_service.stream_generate_card_markdown(chat_text, model_name),
+            mimetype="text/event-stream",
+        )
+        resp.headers["Cache-Control"] = "no-cache"
+        resp.headers["Connection"] = "keep-alive"
+        resp.headers["X-Accel-Buffering"] = "no"
+        return resp
+    except Exception as e:
+        logger.error(f"/generate_card/stream 失败: {e}", exc_info=True)
         return jsonify({"success": False, "error": str(e)}), 500

@@ -6,9 +6,13 @@ import MessageList from './components/MessageList';
 import MessageComposer from './components/MessageComposer';
 import CardModal from './components/CardModal';
 import { streamChatAPI } from './services/chatApi';
+import { generateLearningCard } from './services/generateCardApi';
+import { streamGenerateLearningCard } from './services/generateCardStreamApi';
 import { buildMessages } from '../../utils/buildChatMessages';
+import { appendToCardLibrary } from './services/cardStorage';
 import '../../components/MarkdownViewer.css';
 import './learningChat.css';
+import GenerateCardModal from './components/GenerateCardModal';
 
 function createId() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`.replaceAll('.', '');
@@ -27,7 +31,7 @@ function buildSystemPrompt({ personalityTitle, personalityDesc, task }) {
   const lines = [
     '你是“AI 学伴”，面向学习陪伴场景。',
     '目标：帮助学生理解知识点、拆解步骤、指出易错点、给出可执行练习计划。',
-    '回答风格：简洁、分点、适合复习；必要时给出例题或练习建议。分析题目仔细认真，确保分析的准确性',
+    '回答风格：分析题目仔细认真，确保分析的准确性, 必要时给出例题或练习建议。',
   ];
   if (personalityTitle) lines.push(`学伴性格：${personalityTitle}`);
   if (personalityDesc) lines.push(`性格特点：${personalityDesc}`);
@@ -128,7 +132,7 @@ export default function LearningChatPage() {
 
   const [tasks, setTasks] = useState([
     { id: 't1', title: '今日任务', desc: '做 1 道数学题' },
-    { id: 't2', title: '今日任务', desc: '学习英语：背10个单词' }
+    
   ]);
   const [activeTaskId, setActiveTaskId] = useState('t1');
   const activeTask = useMemo(() => tasks.find((t) => t.id === activeTaskId) || null, [tasks, activeTaskId]);
@@ -171,6 +175,17 @@ export default function LearningChatPage() {
   const [toast, setToast] = useState('');
   const toastTimerRef = useRef(null);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [genOpen, setGenOpen] = useState(false);
+  const [genLoading, setGenLoading] = useState(false);
+  const [genError, setGenError] = useState('');
+  const [genTitle, setGenTitle] = useState('');
+  const [genMarkdown, setGenMarkdown] = useState('');
+  const [genSourceId, setGenSourceId] = useState('');
+  const [genMinimized, setGenMinimized] = useState(false);
+  const genMinimizedRef = useRef(false);
+  const genAbortRef = useRef(null);
+  const genMarkdownRef = useRef('');
+  const genFlushTimerRef = useRef(null);
 
   const showToast = (msg) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -188,6 +203,109 @@ export default function LearningChatPage() {
       content: '你好，我是你的 **AI 学伴**。\n\n知识点或不理解的地方发给我，我会用“步骤 + 易错点 + 练习建议”的方式陪你学。'
     }
   ]);
+
+  useEffect(() => {
+    genMinimizedRef.current = genMinimized;
+  }, [genMinimized]);
+
+  const flushGenMarkdown = () => {
+    if (genFlushTimerRef.current) return;
+    genFlushTimerRef.current = setTimeout(() => {
+      genFlushTimerRef.current = null;
+      if (genMinimizedRef.current) return;
+      setGenMarkdown(genMarkdownRef.current);
+      const m = genMarkdownRef.current.match(/^#\s+(.+)\s*$/m);
+      if (m) setGenTitle((t) => (String(t || '').trim() && t !== '学习卡片' ? t : String(m[1] || '').trim()));
+    }, 80);
+  };
+
+  const runGenerateCard = async (assistantMsgId) => {
+    const id = String(assistantMsgId || '');
+    const idx = messages.findIndex((m) => String(m?.id || '') === id);
+    const slice = idx >= 0 ? messages.slice(0, idx + 1) : messages;
+    const payloadMessages = slice
+      .filter((m) => m && (m.role === 'user' || m.role === 'assistant'))
+      .map((m) => ({ role: m.role, content: String(m.content || '') }))
+      .filter((m) => m.content.trim());
+
+    setGenOpen(true);
+    setGenMinimized(false);
+    setGenLoading(true);
+    setGenError('');
+    setGenTitle('学习卡片');
+    setGenMarkdown('');
+    genMarkdownRef.current = '';
+    setGenSourceId(id);
+
+    try {
+      if (genAbortRef.current) genAbortRef.current.abort();
+    } catch {
+      void 0;
+    }
+    const controller = new AbortController();
+    genAbortRef.current = controller;
+
+    const streamRet = await streamGenerateLearningCard({
+      userId: user?.id,
+      messages: payloadMessages,
+      modelName: selectedModel,
+      onChunk: (piece) => {
+        if (piece?.type === 'delta') {
+          genMarkdownRef.current += String(piece.content || '');
+          if (!genMinimizedRef.current) flushGenMarkdown();
+        } else if (piece?.type === 'error') {
+          setGenError(String(piece.content || '生成学习卡片出错，请重试'));
+        }
+      },
+      signal: controller.signal
+    });
+    if (!streamRet?.ok) {
+      const ret = await generateLearningCard({ userId: user?.id, messages: payloadMessages, modelName: selectedModel });
+      if (!ret?.ok) {
+        setGenError(ret?.error || '生成学习卡片出错，请重试');
+        setGenLoading(false);
+        return;
+      }
+      genMarkdownRef.current = String(ret.markdown || '');
+      setGenTitle(ret.title || '学习卡片');
+      if (!genMinimizedRef.current) setGenMarkdown(genMarkdownRef.current);
+      setGenLoading(false);
+      return;
+    }
+    if (!genMinimizedRef.current) {
+      setGenMarkdown(genMarkdownRef.current);
+      const m = genMarkdownRef.current.match(/^#\s+(.+)\s*$/m);
+      if (m) setGenTitle(String(m[1] || '').trim() || '学习卡片');
+    }
+    setGenLoading(false);
+  };
+
+  const saveGeneratedCard = () => {
+    const content = String(genMarkdownRef.current || genMarkdown || '').trim();
+    if (!content) return;
+    const title = String(genTitle || '').trim() || '学习卡片';
+    const card = { id: createId(), title, meta: 'AI 生成', content };
+    const ret = appendToCardLibrary(user.id, [card]);
+    if (ret?.ok) showToast('已保存到卡片库');
+    try {
+      genAbortRef.current?.abort?.();
+    } catch {
+      void 0;
+    }
+    setGenOpen(false);
+    setGenMinimized(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (genFlushTimerRef.current) clearTimeout(genFlushTimerRef.current);
+      try {
+        genAbortRef.current?.abort?.();
+      } catch {
+        void 0;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -296,6 +414,33 @@ export default function LearningChatPage() {
         role: 'assistant',
         content: `左侧有 **${queued.length}** 张知识卡片。打开并插入到聊天开始学习。`
       }]));
+    } catch {
+      return;
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const key = `ts_chat_task_queue_${user.id}`;
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      window.localStorage.removeItem(key);
+      const queuedTasks = Array.isArray(data?.tasks) ? data.tasks : [];
+      if (queuedTasks.length === 0) return;
+      const normalized = queuedTasks
+        .filter((t) => t && typeof t === 'object')
+        .map((t) => ({
+          id: String(t.id || ''),
+          title: String(t.title || '今日目标'),
+          desc: String(t.desc || '')
+        }))
+        .filter((t) => t.id && t.desc);
+      if (normalized.length === 0) return;
+      const nextActive = String(data?.activeTaskId || '');
+      setTasks(normalized);
+      setActiveTaskId(normalized.some((t) => t.id === nextActive) ? nextActive : normalized[0].id);
     } catch {
       return;
     }
@@ -527,7 +672,11 @@ export default function LearningChatPage() {
         )}
 
         <div className="lcMain">
-          <MessageList messages={messages} streaming={sending} />
+          <MessageList
+            messages={messages}
+            streaming={sending}
+            onGenerateCard={(msgId) => runGenerateCard(msgId)}
+          />
 
           <MessageComposer
             input={input}
@@ -587,6 +736,51 @@ export default function LearningChatPage() {
           setOpenCard(null);
         }}
       />
+      <GenerateCardModal
+        open={genOpen}
+        loading={genLoading}
+        error={genError}
+        title={genTitle}
+        markdown={genMarkdown}
+        onClose={() => {
+          try {
+            genAbortRef.current?.abort?.();
+          } catch {
+            void 0;
+          }
+          setGenOpen(false);
+          setGenMinimized(false);
+          setGenLoading(false);
+          setGenError('');
+          setGenTitle('');
+          setGenMarkdown('');
+          genMarkdownRef.current = '';
+          setGenSourceId('');
+        }}
+        onMinimize={() => {
+          setGenOpen(false);
+          setGenMinimized(true);
+          showToast('已在后台生成学习卡片');
+        }}
+        onRetry={() => runGenerateCard(genSourceId)}
+        onSave={saveGeneratedCard}
+      />
+      {genMinimized && (
+        <div className="lcGenFloat">
+          <div>{genLoading ? '学习卡片生成中…' : '学习卡片已生成'}</div>
+          <button
+            type="button"
+            className="lcGenFloatBtn"
+            onClick={() => {
+              setGenMinimized(false);
+              setGenOpen(true);
+              setGenMarkdown(genMarkdownRef.current);
+            }}
+          >
+            打开
+          </button>
+        </div>
+      )}
       {confirmClear && (
         <div className="lcConfirmMask" role="dialog" aria-modal="true">
           <div className="lcConfirm">

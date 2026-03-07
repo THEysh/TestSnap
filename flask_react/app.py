@@ -6,7 +6,7 @@ import nest_asyncio
 from flask import Flask, jsonify
 from flask_cors import CORS
 
-from flask_react.routes import api_bp
+from flask_react.routes import api_bp, generate_bp
 from flask_react.services import (
     ChatService,
     FileRetention,
@@ -52,6 +52,7 @@ def create_app() -> Flask:
 
     worker.start_monitor()
     app.register_blueprint(api_bp)
+    app.register_blueprint(generate_bp)
 
     @app.errorhandler(404)
     def not_found(_error):
@@ -62,4 +63,3 @@ def create_app() -> Flask:
         return jsonify({"success": False, "error": "服务器内部错误"}), 500
 
     return app
-

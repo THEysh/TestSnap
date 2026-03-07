@@ -917,6 +917,12 @@
   letter-spacing: -0.1px;
 }
 
+.lcModalHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .lcModalX {
   width: 26px;
   height: 26px;
@@ -932,6 +938,39 @@
   padding: 0;
   font-size: 18px;
   line-height: 1;
+}
+
+.lcGenFloat {
+  position: fixed;
+  right: 18px;
+  bottom: 70px;
+  z-index: 76;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(7, 10, 18, 0.92);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  padding: 10px 12px;
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 900;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lcGenFloatBtn {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.lcGenFloatBtn:hover {
+  background: rgba(255, 255, 255, 0.07);
 }
 
 .lcModalBody {

@@ -932,6 +932,130 @@ class ChatService:
             except Exception:
                 pass
 
+    def generate_card(self, chat_text: str, model_name: str | None) -> dict[str, Any]:
+        def extract_json(text: str) -> dict[str, Any] | None:
+            raw = str(text or "").strip()
+            if not raw:
+                return None
+            start = raw.find("{")
+            end = raw.rfind("}")
+            if start == -1 or end == -1 or end <= start:
+                return None
+            candidate = raw[start : end + 1]
+            try:
+                return json.loads(candidate)
+            except Exception:
+                return None
+
+        def normalize_card(obj: dict[str, Any]) -> dict[str, Any] | None:
+            if not isinstance(obj, dict):
+                return None
+            title = str(obj.get("title") or "").strip()
+            kp = obj.get("knowledge_points")
+            if not isinstance(kp, list):
+                kp = []
+            kp_list = [str(x).strip() for x in kp if str(x).strip()]
+            ex = obj.get("example") if isinstance(obj.get("example"), dict) else {}
+            question = str((ex or {}).get("question") or "").strip()
+            analysis = str((ex or {}).get("analysis") or "").strip()
+            summary = str(obj.get("summary") or "").strip()
+            if not title:
+                title = "学习卡片"
+            if not kp_list and not question and not summary:
+                return None
+            return {
+                "title": title,
+                "knowledge_points": kp_list[:8],
+                "example": {"question": question, "analysis": analysis},
+                "summary": summary,
+            }
+
+        system_prompt = "\n".join(
+            [
+                "你是 AI 学伴的学习卡片生成助手。",
+                "你的任务是根据用户刚刚与 AI 的聊天内容，提炼核心知识，并生成一张结构清晰的学习卡片，方便用户复习。",
+                "输出必须为严格 JSON，不要使用 Markdown，不要添加任何解释文字，不要使用代码块。",
+                '输出格式必须为：{"title": "...", "knowledge_points": ["..."], "example": {"question": "...", "analysis": "..."}, "summary": "..."}',
+                "knowledge_points 请输出 3-5 条。",
+                "example 请输出 1 道典型例题的题目与简要解析。",
+                "summary 用一句话总结核心思想。",
+            ]
+        )
+        user_prompt = f"聊天内容如下：\n\n{str(chat_text or '').strip()}\n"
+        reply = self.chat_once(
+            [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+            enable_reasoning=False,
+            model_name=model_name,
+        )
+        if not reply.get("success"):
+            return reply
+        content = str(reply.get("reply") or "")
+        parsed = extract_json(content)
+        if parsed is None:
+            return {"success": False, "error": "生成卡片失败：返回结果不是有效 JSON"}
+        card = normalize_card(parsed)
+        if card is None:
+            return {"success": False, "error": "生成卡片失败：返回 JSON 字段不完整"}
+        return {"success": True, "data": card}
+
+    def stream_generate_card_markdown(self, chat_text: str, model_name: str | None) -> Iterator[str]:
+        system_prompt = "\n".join(
+            [
+                "你是 AI 学伴的学习卡片生成助手。",
+                "你的任务是根据用户刚刚与 AI 的聊天内容，提炼核心知识，并生成一张结构清晰的学习卡片，方便用户复习。",
+                "学习卡片结构如下：标题、知识点（3-5条）、例题（题目+简要解析）、总结。",
+                "内容清晰，不要冗长，适合中学生/大学生复习。",
+                "输出格式必须为 Markdown：",
+                "# 标题",
+                "## 知识点",
+                "- ",
+                "## 例题",
+                "题目：",
+                "解析：",
+                "## 总结",
+            ]
+        )
+        user_prompt = f"聊天内容如下：\n\n{str(chat_text or '').strip()}\n"
+        messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
+
+        loop = asyncio.new_event_loop()
+        try:
+            try:
+                asyncio.set_event_loop(loop)
+            except Exception:
+                pass
+            agen = self._get_model().achat_stream(messages, enable_reasoning=False, model_name=model_name)
+            try:
+                while True:
+                    try:
+                        piece = loop.run_until_complete(agen.__anext__())
+                    except StopAsyncIteration:
+                        break
+                    except GeneratorExit:
+                        break
+                    if isinstance(piece, dict) and piece.get("type") == "content":
+                        payload = json.dumps({"type": "delta", "content": str(piece.get("content") or "")}, ensure_ascii=False)
+                        yield f"data: {payload}\n\n"
+                    elif isinstance(piece, str) and piece:
+                        payload = json.dumps({"type": "delta", "content": str(piece)}, ensure_ascii=False)
+                        yield f"data: {payload}\n\n"
+            finally:
+                try:
+                    loop.run_until_complete(agen.aclose())
+                except Exception:
+                    pass
+        except Exception as e:
+            err = str(e).replace("\n", " ")
+            payload = json.dumps({"type": "error", "content": err}, ensure_ascii=False)
+            yield f"data: {payload}\n\n"
+        finally:
+            try:
+                loop.stop()
+                loop.close()
+            except Exception:
+                pass
+        yield "event: done\ndata: [DONE]\n\n"
+
 
 def init_mimetypes() -> None:
     mimetypes.add_type("image/webp", ".webp")

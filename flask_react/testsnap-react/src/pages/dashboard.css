@@ -68,6 +68,26 @@
   gap: 10px;
 }
 
+.dashEncourage {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.dashEncourageText {
+  flex: 1;
+  min-width: 0;
+  color: rgba(255, 255, 255, 0.84);
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.dashEncourageBtn {
+  flex-shrink: 0;
+}
+
 .dashPill {
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.14);

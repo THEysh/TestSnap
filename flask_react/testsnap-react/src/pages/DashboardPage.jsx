@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useAuth from '../app/auth/useAuth';
 import AppShell from '../app/shell/AppShell';
 import './dashboard.css';
@@ -11,52 +11,297 @@ function getGreeting() {
   return '晚上好';
 }
 
-function getPersonaKey(userId) {
-  return `ts_persona_${userId}`;
+function pickRandom(list) {
+  const arr = Array.isArray(list) ? list : [];
+  if (arr.length === 0) return '';
+  return arr[Math.floor(Math.random() * arr.length)];
 }
 
-function loadPersona(userId) {
+function createId() {
+  return `${Date.now()}_${Math.random().toString(16).slice(2)}`.replaceAll('.', '');
+}
+
+function safeJsonParse(value, fallback) {
   try {
-    const v = window.localStorage.getItem(getPersonaKey(userId));
-    return v || 'gentle';
+    const parsed = JSON.parse(value);
+    return parsed ?? fallback;
   } catch {
-    return 'gentle';
+    return fallback;
   }
 }
 
-function savePersona(userId, persona) {
+function getGoalTodosKey(userId) {
+  return `ts_dash_goal_todos_${userId}`;
+}
+
+function getSuggestTodosKey(userId) {
+  return `ts_dash_suggest_todos_${userId}`;
+}
+
+function getDashStateKey(userId) {
+  return `ts_dash_state_${userId}`;
+}
+
+function loadDashState(userId) {
   try {
-    window.localStorage.setItem(getPersonaKey(userId), persona);
+    const raw = window.localStorage.getItem(getDashStateKey(userId));
+    const data = safeJsonParse(raw, null);
+    if (!data || typeof data !== 'object') return null;
+    return {
+      mood: typeof data.mood === 'string' ? data.mood : '',
+      goal: typeof data.goal === 'string' ? data.goal : '',
+      encourage: typeof data.encourage === 'string' ? data.encourage : ''
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveDashState(userId, state) {
+  try {
+    window.localStorage.setItem(getDashStateKey(userId), JSON.stringify({ ts: Date.now(), ...state }));
   } catch {
     return;
   }
+}
+
+function loadGoalTodos(userId) {
+  try {
+    const raw = window.localStorage.getItem(getGoalTodosKey(userId));
+    const data = safeJsonParse(raw, []);
+    if (!Array.isArray(data)) return [];
+    return data
+      .filter((x) => x && typeof x === 'object')
+      .map((x) => ({ id: String(x.id || ''), text: String(x.text || '') }))
+      .filter((x) => x.id && x.text);
+  } catch {
+    return [];
+  }
+}
+
+function saveGoalTodos(userId, todos) {
+  try {
+    window.localStorage.setItem(getGoalTodosKey(userId), JSON.stringify(todos));
+  } catch {
+    return;
+  }
+}
+
+function loadSuggestTodos(userId, fallback) {
+  try {
+    const raw = window.localStorage.getItem(getSuggestTodosKey(userId));
+    const data = safeJsonParse(raw, null);
+    if (!data) return fallback;
+    if (!Array.isArray(data)) return fallback;
+    const normalized = data
+      .filter((x) => x && typeof x === 'object')
+      .map((x) => ({ id: String(x.id || ''), text: String(x.text || '') }))
+      .filter((x) => x.id && x.text);
+    return normalized.length > 0 ? normalized : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveSuggestTodos(userId, todos) {
+  try {
+    window.localStorage.setItem(getSuggestTodosKey(userId), JSON.stringify(todos));
+  } catch {
+    return;
+  }
+}
+
+function getChatTaskQueueKey(userId) {
+  return `ts_chat_task_queue_${userId}`;
 }
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
   const [mood, setMood] = useState('');
   const [goal, setGoal] = useState('');
-
-  const [persona, setPersona] = useState(() => {
-    if (!user?.id) return 'gentle';
-    return loadPersona(user.id);
-  });
+  const [goalTodos, setGoalTodos] = useState([]);
+  const [suggestTodos, setSuggestTodos] = useState([]);
+  const loadedRef = useRef(false);
+  const suggestLoadedRef = useRef(false);
+  const dashLoadedRef = useRef(false);
+  const persistTimerRef = useRef(null);
 
   const greeting = useMemo(() => getGreeting(), []);
   const nickname = user?.name || '同学';
+
+  const encourageOptions = useMemo(() => ([
+    'AI 学伴给你加油打气中 (ง •_•)ง',
+    '今天也要闪闪发光 (✧∀✧)',
+    '你已经很棒了，再坚持一下就超神 (๑•̀ㅂ•́)و✧',
+    '慢慢来，稳稳赢 (´▽｀)',
+    '这题不怕，我陪你拆开做 (•̀ω•́)✧',
+    '把今天学到的每一步都算进成长值里 (｡•̀ᴗ-)✧',
+    '你不是一个人在战斗 (ง •̀_•́)ง',
+    '专注 10 分钟，也是一种胜利 (•̀ᴗ•́)و ̑̑',
+    '再试一次，说不定这次就通关了 (ง •̀_•́)ง',
+    '小小一步，也是向前的一大步 (•̀ᴗ•́)و',
+    '别急，思路正在加载中 (￣▽￣)ノ',
+    '思考一下，你已经离答案更近了 (•̀ω•́)✧',
+    '保持好奇心，学习会更有趣 (✿◡‿◡)',
+    '今天的努力，会变成明天的底气 (๑•̀ㅂ•́)و✧',
+    '一步一步来，难题也会变简单 (｡•̀ᴗ-)✧',
+    '你认真思考的样子真的很厉害 (✧ω✧)',
+    '学习模式已启动，冲鸭 (ง •̀_•́)ง',
+    '再看一遍题目，说不定灵感就来了 (•̀ᴗ•́)و',
+    '慢一点没关系，只要在前进 (´▽｀)',
+    '每一次尝试都在升级你的大脑 (✧∀✧)',
+    '思考 + 耐心 = 解题超能力 (๑•̀ㅂ•́)و✧',
+    '困难只是经验值比较多的怪物 (ง •̀_•́)ง',
+    '别担心，我会陪你一起想 (•̀ω•́)✧',
+    '学习是一场长期升级任务 (✿◠‿◠)',
+    '答案可能就在下一次尝试里 (•̀ᴗ•́)و',
+    '保持节奏，你做得很好 (´▽｀)ノ',
+    '这一步理解了，就离成功更近了 (✧ω✧)',
+    '认真思考的每一秒都不浪费 (๑•̀ㅂ•́)و✧',
+    '学习进度 +1 (ง •̀_•́)ง',
+    '再坚持一下，马上就突破了 (•̀ω•́)✧',
+    '别怕难题，它只是想和你做朋友 (´▽｀)',
+    '你正在变得越来越强 (✧∀✧)',
+    '思路已经在路上了，等等它 (•̀ᴗ•́)و',
+    '今天也在认真升级自己 (ง •̀_•́)ง',
+    '保持专注，奇迹会发生 (✧ω✧)',
+    '慢慢理解，比记住更厉害 (•̀ω•́)✧',
+    '每一题都是经验值 (๑•̀ㅂ•́)و✧',
+    '你正在悄悄变强 (✿◡‿◡)'
+  ]), []);
+  const [encourage, setEncourage] = useState(() => pickRandom(encourageOptions));
+
+  const refreshEncourage = () => {
+    setEncourage((prev) => {
+      if (encourageOptions.length <= 1) return prev;
+      let next = prev;
+      for (let i = 0; i < 6 && next === prev; i++) next = pickRandom(encourageOptions);
+      return next;
+    });
+  };
+
+  const statusText = '随时待命';
+  const face = '(ﾉ◕ヮ◕)ﾉ';
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const restored = loadDashState(user.id);
+    dashLoadedRef.current = true;
+    if (!restored) return;
+    if (restored.mood) setMood(restored.mood);
+    if (typeof restored.goal === 'string') setGoal(restored.goal);
+    if (restored.encourage) setEncourage(restored.encourage);
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    if (!dashLoadedRef.current) return;
+    if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    persistTimerRef.current = setTimeout(() => {
+      saveDashState(user.id, { mood, goal, encourage });
+      persistTimerRef.current = null;
+    }, 180);
+  }, [user?.id, mood, goal, encourage]);
+
+  useEffect(() => {
+    return () => {
+      if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    loadedRef.current = true;
+    setGoalTodos(loadGoalTodos(user.id));
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    if (!loadedRef.current) return;
+    saveGoalTodos(user.id, goalTodos);
+  }, [user?.id, goalTodos]);
+
+  const defaultSuggestTodos = useMemo(() => ([
+    { id: 's1', text: '先来 1 道中等难度数学题巩固' },
+
+  ]), []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    suggestLoadedRef.current = true;
+    setSuggestTodos(loadSuggestTodos(user.id, defaultSuggestTodos));
+  }, [user?.id, defaultSuggestTodos]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    if (!suggestLoadedRef.current) return;
+    saveSuggestTodos(user.id, suggestTodos);
+  }, [user?.id, suggestTodos]);
+
+  const addGoalTodo = () => {
+    const t = goal.trim();
+    if (!t) return;
+    const id = createId();
+    setGoalTodos((prev) => prev.concat([{ id, text: t }]));
+    setGoal('');
+  };
+
+  const queueChatTasksAndGo = useCallback((activeId) => {
+    if (!user?.id) return;
+    const tasks = [
+      ...goalTodos.map((g) => ({ id: g.id, title: '今日目标', desc: g.text })),
+      ...suggestTodos.map((s) => ({ id: s.id, title: '学习建议', desc: s.text }))
+    ];
+    const payload = { tasks, activeTaskId: String(activeId || '') };
+    try {
+      window.localStorage.setItem(getChatTaskQueueKey(user.id), JSON.stringify(payload));
+    } catch {
+      void 0;
+    }
+    window.location.hash = '#/chat';
+  }, [user?.id, goalTodos, suggestTodos]);
+
+  const startGoalTodo = useCallback((goalId) => {
+    queueChatTasksAndGo(goalId);
+  }, [queueChatTasksAndGo]);
+
+  const removeGoalTodo = useCallback((goalId) => {
+    setGoalTodos((prev) => prev.filter((x) => x.id !== goalId));
+  }, []);
+
+  const startSuggestTodo = useCallback((suggestId) => {
+    queueChatTasksAndGo(suggestId);
+  }, [queueChatTasksAndGo]);
+
+  const removeSuggestTodo = useCallback((suggestId) => {
+    setSuggestTodos((prev) => prev.filter((x) => x.id !== suggestId));
+  }, []);
+
+  const todos = useMemo(() => {
+    const goalItems = goalTodos.map((g) => ({
+      id: g.id,
+      text: `今日目标：${g.text}`,
+      primary: '开始',
+      secondary: '稍后',
+      onPrimary: () => startGoalTodo(g.id),
+      onSecondary: () => removeGoalTodo(g.id)
+    }));
+    const suggestItems = suggestTodos.map((s) => ({
+      id: s.id,
+      text: s.text,
+      primary: '开始',
+      secondary: '稍后',
+      onPrimary: () => startSuggestTodo(s.id),
+      onSecondary: () => removeSuggestTodo(s.id)
+    }));
+    return goalItems.concat(suggestItems);
+  }, [goalTodos, suggestTodos, startGoalTodo, removeGoalTodo, startSuggestTodo, removeSuggestTodo]);
 
   if (!loading && !user) {
     window.location.hash = '#/login';
     return null;
   }
-
-  const statusText = persona === 'gentle'
-    ? '温柔陪伴中'
-    : persona === 'sharp'
-      ? '毒舌监督中'
-      : '沙雕打气中';
-
-  const face = persona === 'gentle' ? '(*´▽｀*)' : persona === 'sharp' ? '(¬_¬ )' : '(ﾉ◕ヮ◕)ﾉ';
+  if (loading || !user) return null;
 
   return (
     <AppShell title="学习中枢">
@@ -74,7 +319,7 @@ export default function DashboardPage() {
             <div className="dashField">
               <div className="dashLabel">今日心情</div>
               <div className="dashMoodBtns">
-                {['开心', '一般', '疲惫', '冲刺'].map((v) => (
+                {['开心', '一般', '疲惫', '困惑', '焦虑', '专注', '无聊', '有动力'].map((v) => (
                   <button
                     key={v}
                     type="button"
@@ -87,37 +332,11 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="dashField">
-              <div className="dashLabel">学伴性格</div>
-              <div className="dashMoodBtns">
-                <button
-                  type="button"
-                  className={persona === 'gentle' ? 'dashPill is-active' : 'dashPill'}
-                  onClick={() => {
-                    setPersona('gentle');
-                    if (user?.id) savePersona(user.id, 'gentle');
-                  }}
-                >
-                  温柔
-                </button>
-                <button
-                  type="button"
-                  className={persona === 'sharp' ? 'dashPill is-active' : 'dashPill'}
-                  onClick={() => {
-                    setPersona('sharp');
-                    if (user?.id) savePersona(user.id, 'sharp');
-                  }}
-                >
-                  毒舌
-                </button>
-                <button
-                  type="button"
-                  className={persona === 'funny' ? 'dashPill is-active' : 'dashPill'}
-                  onClick={() => {
-                    setPersona('funny');
-                    if (user?.id) savePersona(user.id, 'funny');
-                  }}
-                >
-                  沙雕
+              <div className="dashLabel">每日AI鼓励</div>
+              <div className="dashEncourage">
+                <div className="dashEncourageText">{encourage}</div>
+                <button type="button" className="dashBtnSmall dashBtnSmallGhost dashEncourageBtn" onClick={refreshEncourage}>
+                  换一句
                 </button>
               </div>
             </div>
@@ -135,14 +354,10 @@ export default function DashboardPage() {
               <button
                 type="button"
                 className="dashBtnPrimary"
-                onClick={() => {
-                  if (!goal.trim()) return;
-                  setGoal('');
-                }}
+                onClick={addGoalTodo}
               >
-                打卡
+                增加目标
               </button>
-              <a className="dashBtnGhost" href="#/demo">去 Demo</a>
             </div>
             <a className="dashEntryCard" href="#/chat">
               <div className="dashEntryTitle">AI 学习聊天</div>
@@ -154,20 +369,19 @@ export default function DashboardPage() {
         <div className="dashCard">
           <div className="dashCardTitle">当前学习建议 / 智能待办</div>
           <div className="dashTodo">
-            <div className="dashTodoItem">
-              <div className="dashTodoMain">你昨天数学错了 3 道，今天来 3 道中等难度巩固？</div>
-              <div className="dashTodoActions">
-                <button type="button" className="dashBtnSmall">开始</button>
-                <button type="button" className="dashBtnSmall dashBtnSmallGhost">稍后</button>
+            {todos.map((t) => (
+              <div key={t.id} className="dashTodoItem">
+                <div className="dashTodoMain">{t.text}</div>
+                <div className="dashTodoActions">
+                  <button type="button" className="dashBtnSmall" onClick={t.onPrimary}>
+                    {t.primary}
+                  </button>
+                  <button type="button" className="dashBtnSmall dashBtnSmallGhost" onClick={t.onSecondary}>
+                    {t.secondary}
+                  </button>
+                </div>
               </div>
-            </div>
-            <div className="dashTodoItem">
-              <div className="dashTodoMain">英语基础不牢固，背10个单词？</div>
-              <div className="dashTodoActions">
-                <button type="button" className="dashBtnSmall">开始</button>
-                <button type="button" className="dashBtnSmall dashBtnSmallGhost">稍后</button>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
 
