@@ -7,6 +7,7 @@ import sys
 import os
 import base64
 import mimetypes
+import inspect
 from urllib.parse import urlparse
 from srcProject.utlis.common import find_project_root
 
@@ -39,6 +40,21 @@ class SiliconChatModel(BaseModel):
     def _load_model(self):
         key = self._api_keys[0] if isinstance(self._api_keys, list) else self._api_keys
         self.client = AsyncOpenAI(api_key=key, base_url=self._base_url)
+
+    async def aclose(self) -> None:
+        c = self.client
+        self.client = None
+        if c is None:
+            return
+        close = getattr(c, "close", None)
+        if close is None:
+            return
+        try:
+            res = close()
+            if inspect.isawaitable(res):
+                await res
+        except Exception:
+            return
 
     @property
     def names(self) -> Dict[int, str]:
@@ -203,4 +219,3 @@ class SiliconChatModel(BaseModel):
 # "model_name": "zai-org/GLM-4.5V"
 #
 # }
-

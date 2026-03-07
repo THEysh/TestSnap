@@ -8,14 +8,12 @@ Responsible for:
 - Corresponds to MonkeyOCR_model in the original implementation
 """
 from srcProject.config.settings import LAYOUT_MODEL_NAME, LAYOUT_WEIGHTS_PATH, READ_MODEL_NAME, READ_WEIGHTS_PATH, \
-    FLOW_API_NAME, FLOW_API_KEY, FLOW_URL, DEVICE, FLOW_USE_MODEL_NAME, \
-    CHAT_API_NAME, CHAT_API_KEY, CHAT_URL, CHAT_MODEL_NAME
+    FLOW_API_NAME, FLOW_API_KEY, FLOW_URL, DEVICE, FLOW_USE_MODEL_NAME
 from srcProject.models.layout_detector import DocLayoutYOLO
 from srcProject.models.layout_reader import LayoutReader
 from srcProject.models.model_base import BaseModel
 from srcProject.models.siliconflow_api import Silicon
 from srcProject.models.reader_xy_cut import XY_CUT
-from srcProject.models.chat_model import SiliconChatModel
 
 class ModelFactory:
     @staticmethod
@@ -34,6 +32,7 @@ class ModelFactory:
         elif api_name.lower() == 'siliconflow':
             return Silicon(api_keys=api_key, base_url=base_url, model_name=model_name)
         elif api_name.lower() == 'siliconflow_chat':
+            from srcProject.models.chat_model import SiliconChatModel
             return SiliconChatModel(api_keys=api_key, base_url=base_url, model_name=model_name, device='api')
         else:
             raise ValueError(f"不支持的模型名称: {model_name}")
@@ -71,16 +70,6 @@ class ModelManager:
         self._ocr_model_name = FLOW_USE_MODEL_NAME
         self._ocr_api_keys = self._normalize_api_keys(FLOW_API_KEY)
         print(f"已加载OCR-api模型: {FLOW_API_NAME},当前激活: {FLOW_USE_MODEL_NAME}")
-
-        # 加载聊天模型
-        chat_api_name = 'siliconflow_chat' if CHAT_API_NAME.lower() == 'siliconflow' else CHAT_API_NAME.lower()
-        self.chat_model = ModelFactory.create(
-            api_key=CHAT_API_KEY,
-            base_url=CHAT_URL,
-            api_name=chat_api_name,
-            model_name=CHAT_MODEL_NAME
-        )
-        print(f"已加载Chat-api模型: {CHAT_API_NAME}, 当前激活: {CHAT_MODEL_NAME}")
 
     def _normalize_api_keys(self, api_key: list | str | None) -> tuple[str, ...]:
         if api_key is None:
@@ -162,29 +151,3 @@ class ModelManager:
         print(f"已加载OCR-api模型: {api_name},当前激活: {model_name}")
         return True
 
-    def change_chat_model(self, model_name:str,
-                          api_name:str =None,
-                          api_key:list|str =None,
-                          base_url:str =None):
-        if not model_name:
-            print("model_name is None or empty; 更新失败")
-            return False
-        if not api_key:
-            print("api_key is None or empty; 更新失败")
-            return False
-        if not base_url:
-            print("base_url is None or empty; 更新失败")
-            return False
-        if not api_name:
-            api_name = CHAT_API_NAME
-        if str(api_name).lower() != 'siliconflow':
-            raise ValueError("仅支持 siliconflow 作为 Chat API")
-        chat_api_name = 'siliconflow_chat' if api_name.lower() == 'siliconflow' else api_name.lower()
-        self.chat_model = ModelFactory.create(
-            api_key=api_key,
-            base_url=base_url,
-            api_name=chat_api_name,
-            model_name=model_name
-        )
-        print(f"已加载Chat-api模型: {api_name},当前激活: {model_name}")
-        return True

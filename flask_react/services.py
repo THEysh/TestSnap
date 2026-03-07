@@ -512,134 +512,150 @@ def _subprocess_worker_main(in_q: Any, out_q: Any, api_base_url: str) -> None:
     from srcProject.main_process_sequence import get_model_manager as worker_get_model_manager
     from srcProject.main_process_sequence import main as process_main
 
-    while True:
-        try:
-            job = in_q.get()
-        except (KeyboardInterrupt, EOFError):
-            break
-        if job is None:
-            break
-
-        kind = job.get("kind") or "process"
-        if kind == "warmup":
-            command_id = job.get("command_id")
+    try:
+        while True:
             try:
-                mgr = worker_get_model_manager()
-                out_q.put(
-                    {
-                        "type": "command_result",
-                        "command_id": command_id,
-                        "success": True,
-                        "pid": os.getpid(),
-                        "device": getattr(mgr, "device", None),
-                    }
-                )
-            except Exception as e:
-                out_q.put({"type": "command_result", "command_id": command_id, "success": False, "error": str(e)})
-            continue
+                job = in_q.get()
+            except (KeyboardInterrupt, EOFError):
+                break
+            if job is None:
+                break
 
-        if kind == "update_config":
-            command_id = job.get("command_id")
-            payload = job.get("payload") or {}
-            try:
-                mgr = worker_get_model_manager()
-                updated: dict[str, Any] = {}
-                if read_model := payload.get("read_model"):
-                    updated["read_model"] = mgr.change_read_model(model_name=read_model)
-                ocr_api_model = payload.get("ocr_api_model")
-                if isinstance(ocr_api_model, dict):
-                    updated["ocr_api_model"] = mgr.change_ocr_recognizer(
-                        api_name=ocr_api_model.get("api_name", None),
-                        api_key=ocr_api_model.get("api_key", None),
-                        base_url=ocr_api_model.get("base_url", None),
-                        model_name=ocr_api_model.get("model_name", None),
-                    )
-                out_q.put({"type": "command_result", "command_id": command_id, "success": True, "updated": updated})
-            except Exception as e:
-                out_q.put({"type": "command_result", "command_id": command_id, "success": False, "error": str(e)})
-            continue
-
-        task_id = job.get("task_id")
-        file_path = job.get("file_path")
-        file_type = job.get("file_type")
-        try:
-            def progress_update(local_task_id: str, progress: float, status: str = "processing", message: str | None = None) -> None:
-                out_q.put(
-                    {
-                        "type": "progress",
-                        "task_id": local_task_id,
-                        "progress": progress,
-                        "status": status,
-                        "message": message,
-                    }
-                )
-
-            def stream_callback(local_task_id: str, payload: Any) -> None:
-                out_q.put({"type": "stream", "task_id": local_task_id, "payload": payload})
-
-            out_q.put(
-                {"type": "status", "task_id": task_id, "status": "processing", "message": f"正在处理{file_type}文件"}
-            )
-
-            try:
-                md_save_path, visualize_path = asyncio.run(
-                    process_main(
-                        file_path,
-                        task_id=task_id,
-                        stream_callback=stream_callback,
-                        stream_api_base_url=api_base_url,
-                        progress_update=progress_update,
-                    )
-                )
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                md_save_path, visualize_path = loop.run_until_complete(
-                    process_main(
-                        file_path,
-                        task_id=task_id,
-                        stream_callback=stream_callback,
-                        stream_api_base_url=api_base_url,
-                        progress_update=progress_update,
-                    )
-                )
+            kind = job.get("kind") or "process"
+            if kind == "warmup":
+                command_id = job.get("command_id")
                 try:
-                    loop.stop()
-                    loop.close()
-                except Exception:
-                    pass
+                    mgr = worker_get_model_manager()
+                    out_q.put(
+                        {
+                            "type": "command_result",
+                            "command_id": command_id,
+                            "success": True,
+                            "pid": os.getpid(),
+                            "device": getattr(mgr, "device", None),
+                        }
+                    )
+                except Exception as e:
+                    out_q.put({"type": "command_result", "command_id": command_id, "success": False, "error": str(e)})
+                continue
 
-            if not os.path.isfile(visualize_path):
-                raise RuntimeError("路径不存在，处理失败")
+            if kind == "update_config":
+                command_id = job.get("command_id")
+                payload = job.get("payload") or {}
+                try:
+                    mgr = worker_get_model_manager()
+                    updated: dict[str, Any] = {}
+                    if read_model := payload.get("read_model"):
+                        updated["read_model"] = mgr.change_read_model(model_name=read_model)
+                    ocr_api_model = payload.get("ocr_api_model")
+                    if isinstance(ocr_api_model, dict):
+                        updated["ocr_api_model"] = mgr.change_ocr_recognizer(
+                            api_name=ocr_api_model.get("api_name", None),
+                            api_key=ocr_api_model.get("api_key", None),
+                            base_url=ocr_api_model.get("base_url", None),
+                            model_name=ocr_api_model.get("model_name", None),
+                        )
+                    out_q.put({"type": "command_result", "command_id": command_id, "success": True, "updated": updated})
+                except Exception as e:
+                    out_q.put({"type": "command_result", "command_id": command_id, "success": False, "error": str(e)})
+                continue
 
-            visualize_relative_path = to_relative_path(visualize_path)
-            md_relative_path = to_relative_path(md_save_path)
+            task_id = job.get("task_id")
+            file_path = job.get("file_path")
+            file_type = job.get("file_type")
             try:
-                result_directory = os.path.dirname(visualize_path) or os.path.dirname(md_save_path)
-            except Exception:
-                result_directory = None
-            result = {
-                "success": True,
-                "processed_file": visualize_relative_path,
-                "md_path": md_relative_path,
-                "processing_info": {
-                    "method": "示例处理",
-                    "description": "示例处理",
-                    "file_size": os.path.getsize(visualize_path),
-                    "auto_delete_info": "该文件将在3小时后自动删除",
-                },
-            }
-            out_q.put(
-                {
-                    "type": "done",
-                    "task_id": task_id,
+                def progress_update(local_task_id: str, progress: float, status: str = "processing", message: str | None = None) -> None:
+                    out_q.put(
+                        {
+                            "type": "progress",
+                            "task_id": local_task_id,
+                            "progress": progress,
+                            "status": status,
+                            "message": message,
+                        }
+                    )
+
+                def stream_callback(local_task_id: str, payload: Any) -> None:
+                    out_q.put({"type": "stream", "task_id": local_task_id, "payload": payload})
+
+                out_q.put(
+                    {"type": "status", "task_id": task_id, "status": "processing", "message": f"正在处理{file_type}文件"}
+                )
+
+                try:
+                    md_save_path, visualize_path = asyncio.run(
+                        process_main(
+                            file_path,
+                            task_id=task_id,
+                            stream_callback=stream_callback,
+                            stream_api_base_url=api_base_url,
+                            progress_update=progress_update,
+                        )
+                    )
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    md_save_path, visualize_path = loop.run_until_complete(
+                        process_main(
+                            file_path,
+                            task_id=task_id,
+                            stream_callback=stream_callback,
+                            stream_api_base_url=api_base_url,
+                            progress_update=progress_update,
+                        )
+                    )
+                    try:
+                        loop.stop()
+                        loop.close()
+                    except Exception:
+                        pass
+
+                if not os.path.isfile(visualize_path):
+                    raise RuntimeError("路径不存在，处理失败")
+
+                visualize_relative_path = to_relative_path(visualize_path)
+                md_relative_path = to_relative_path(md_save_path)
+                try:
+                    result_directory = os.path.dirname(visualize_path) or os.path.dirname(md_save_path)
+                except Exception:
+                    result_directory = None
+                result = {
                     "success": True,
-                    "result": result,
-                    "result_directory": result_directory,
+                    "processed_file": visualize_relative_path,
+                    "md_path": md_relative_path,
+                    "processing_info": {
+                        "method": "示例处理",
+                        "description": "示例处理",
+                        "file_size": os.path.getsize(visualize_path),
+                        "auto_delete_info": "该文件将在3小时后自动删除",
+                    },
                 }
-            )
-        except Exception as e:
-            out_q.put({"type": "done", "task_id": task_id, "success": False, "error": str(e)})
+                out_q.put(
+                    {
+                        "type": "done",
+                        "task_id": task_id,
+                        "success": True,
+                        "result": result,
+                        "result_directory": result_directory,
+                    }
+                )
+            except Exception as e:
+                out_q.put({"type": "done", "task_id": task_id, "success": False, "error": str(e)})
+    finally:
+        try:
+            import srcProject.main_process_sequence as _mps
+            mgr = getattr(_mps, "_MODEL_MANAGER", None)
+            if mgr is not None:
+                chat_model = getattr(mgr, "chat_model", None)
+                if chat_model is not None:
+                    close = getattr(chat_model, "aclose", None)
+                    if close is not None:
+                        try:
+                            asyncio.run(close())
+                        except Exception:
+                            pass
+        except Exception:
+            pass
 
 
 class FileService:
