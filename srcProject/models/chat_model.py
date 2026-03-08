@@ -183,7 +183,7 @@ class SiliconChatModel(BaseModel):
                 ct = getattr(delta, "content", None)
                 if ct: yield {"type": "content", "content": str(ct)}
         except Exception as e:
-            error_msg = f"API调用错误: {str(e)}"
+            error_msg = f"API调用错误: {str(e)}, 检查网络连接"
             print(error_msg)
             # 可以选择是否将错误传递给调用方
             if enable_reasoning:
