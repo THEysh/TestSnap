@@ -54,9 +54,11 @@ export default function FileProcessing() {
   const toastTimerRef = useRef(null);
   const uiPersistTimerRef = useRef(null);
   const uiLoadedRef = useRef(false);
+  const fileUrlRef = useRef('');
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [selectedFileMeta, setSelectedFileMeta] = useState(null);
+  const [fileObjectUrl, setFileObjectUrl] = useState('');
   const [markdown, setMarkdown] = useState('');
   const [dirty, setDirty] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
@@ -67,6 +69,8 @@ export default function FileProcessing() {
   const [previewSelection, setPreviewSelection] = useState({ open: false, text: '', x: 0, y: 0 });
   const [toast, setToast] = useState('');
   const [openCard, setOpenCard] = useState(null);
+  const [filePreviewHeight, setFilePreviewHeight] = useState(360);
+  const resizeRef = useRef({ dragging: false, startY: 0, startH: 360 });
 
   useEffect(() => {
     if (!loading && !user) window.location.hash = '#/login';
@@ -88,6 +92,7 @@ export default function FileProcessing() {
       if (Array.isArray(data.cards)) setCards(data.cards);
       if (Array.isArray(data.selectedIds)) setSelectedIds(new Set(data.selectedIds));
       if (data.selectedFileMeta && typeof data.selectedFileMeta === 'object') setSelectedFileMeta(data.selectedFileMeta);
+      if (typeof data.filePreviewHeight === 'number' && Number.isFinite(data.filePreviewHeight)) setFilePreviewHeight(data.filePreviewHeight);
     } catch {
       return;
     }
@@ -107,6 +112,7 @@ export default function FileProcessing() {
           cards,
           selectedIds: Array.from(selectedIds),
           selectedFileMeta,
+          filePreviewHeight,
           ts: Date.now()
         };
         window.localStorage.setItem(`ts_file_processing_ui_${user.id}`, JSON.stringify(payload));
@@ -116,14 +122,68 @@ export default function FileProcessing() {
         uiPersistTimerRef.current = null;
       }
     }, 200);
-  }, [user?.id, markdown, dirty, draftTitle, draftContent, cards, selectedIds, selectedFileMeta]);
+  }, [user?.id, markdown, dirty, draftTitle, draftContent, cards, selectedIds, selectedFileMeta, filePreviewHeight]);
 
   useEffect(() => {
     return () => {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       if (uiPersistTimerRef.current) clearTimeout(uiPersistTimerRef.current);
+      if (fileUrlRef.current) URL.revokeObjectURL(fileUrlRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    const onMove = (e) => {
+      if (!resizeRef.current.dragging) return;
+      const dy = (e?.clientY ?? 0) - resizeRef.current.startY;
+      const next = Math.max(220, Math.min(900, resizeRef.current.startH + dy));
+      setFilePreviewHeight(next);
+    };
+    const onUp = () => {
+      if (!resizeRef.current.dragging) return;
+      resizeRef.current.dragging = false;
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedFile) {
+      if (fileUrlRef.current) URL.revokeObjectURL(fileUrlRef.current);
+      fileUrlRef.current = '';
+      setFileObjectUrl('');
+      return;
+    }
+    if (fileUrlRef.current) URL.revokeObjectURL(fileUrlRef.current);
+    fileUrlRef.current = URL.createObjectURL(selectedFile);
+    setFileObjectUrl(fileUrlRef.current);
+  }, [selectedFile]);
+
+  useEffect(() => {
+    const info = upload.uploadedFileInfo;
+    if (!info || !selectedFileMeta) return;
+    const filePath = String(info.file_path || '').trim();
+    const unique = String(info.unique_filename || '').trim();
+    const name = String(selectedFileMeta?.name || '').trim();
+    const typeStr = String(selectedFileMeta?.type || '').trim();
+    const isPdf = typeStr.includes('pdf') || /\.pdf$/i.test(name);
+    let rel = '';
+    if (filePath) {
+      const normalized = filePath.replaceAll('\\', '/');
+      const i = normalized.toLowerCase().indexOf('srcproject/');
+      if (i >= 0) rel = normalized.slice(i);
+    }
+    if (!rel && unique) {
+      rel = `srcProject/output/visualizations/uploads/${isPdf ? 'pdfs' : 'images'}/${unique}`;
+    }
+    if (!rel) return;
+    const serverUrl = `${ENDPOINTS.FILES}${rel}`;
+    setSelectedFileMeta((prev) => ({ ...(prev || {}), serverUrl, unique_filename: unique, file_path: filePath }));
+  }, [upload.uploadedFileInfo, selectedFileMeta]);
 
   const showToast = (msg) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -185,6 +245,17 @@ export default function FileProcessing() {
     const type = typeStr.includes('pdf') || /\.pdf$/i.test(name) ? 'PDF' : '图片';
     return `已选择：${name}（${type}）`;
   }, [selectedFile, selectedFileMeta]);
+
+  const previewInfo = useMemo(() => {
+    const f = selectedFile || selectedFileMeta;
+    if (!f) return null;
+    const name = String(f.name || '').trim();
+    const typeStr = String(f.type || '').trim();
+    const isPdf = typeStr.includes('pdf') || /\.pdf$/i.test(name);
+    const url = fileObjectUrl || String(selectedFileMeta?.serverUrl || '').trim();
+    if (!url) return null;
+    return { isPdf, url, name };
+  }, [selectedFile, selectedFileMeta, fileObjectUrl]);
 
   const onPick = () => fileInputRef.current?.click();
 
@@ -440,6 +511,29 @@ export default function FileProcessing() {
           )}
 
           {!!error && <div className="fpError">{error}</div>}
+
+          {previewInfo && (
+            <div className="fpFilePreview">
+              <div className="fpFilePreviewTitle">文件预览</div>
+              <div className="fpFilePreviewBody" style={{ height: `${filePreviewHeight}px` }}>
+                {previewInfo.isPdf ? (
+                  <iframe title={previewInfo.name || 'PDF预览'} src={previewInfo.url} />
+                ) : (
+                  <img alt={previewInfo.name || '图片预览'} src={previewInfo.url} />
+                )}
+              </div>
+              <div
+                className="fpResizeHandle"
+                role="separator"
+                aria-label="调整预览高度"
+                onMouseDown={(e) => {
+                  resizeRef.current.dragging = true;
+                  resizeRef.current.startY = e.clientY;
+                  resizeRef.current.startH = filePreviewHeight;
+                }}
+              />
+            </div>
+          )}
         </div>
 
         <div className="fpSplit">
