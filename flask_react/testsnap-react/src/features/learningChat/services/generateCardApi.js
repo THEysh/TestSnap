@@ -1,3 +1,5 @@
+import { API_BASE_URL, API_ROOT_URL } from '../../../constants/apiConfig';
+
 function safeJsonParse(value, fallback) {
   try {
     const parsed = JSON.parse(value);
@@ -46,7 +48,7 @@ function normalizeMarkdownResult(markdown) {
   return { title, markdown: md };
 }
 
-export async function generateLearningCard({ userId, messages }) {
+export async function generateLearningCard({ userId, messages, modelName }) {
   const normalizedMessages = (messages || [])
     .filter((m) => m && (m.role === 'user' || m.role === 'assistant'))
     .map((m) => ({ role: m.role, content: String(m.content || '') }))
@@ -59,14 +61,16 @@ export async function generateLearningCard({ userId, messages }) {
   const body = JSON.stringify({
     user_id: userId || null,
     messages: normalizedMessages,
-    chat: chatText
+    chat: chatText,
+    model_name: modelName || null
   });
 
-  const endpoints = ['/generate_card', '/api/generate_card'];
-  if (typeof window !== 'undefined') {
-    endpoints.push('http://localhost:7861/generate_card');
-    endpoints.push('http://localhost:7861/api/generate_card');
-  }
+  const endpoints = Array.from(new Set([
+    `${API_ROOT_URL}/generate_card`,
+    `${API_BASE_URL}/generate_card`,
+    '/generate_card',
+    '/api/generate_card'
+  ]));
 
   for (let i = 0; i < endpoints.length; i++) {
     const url = endpoints[i];

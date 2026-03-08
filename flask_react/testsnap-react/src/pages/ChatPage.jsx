@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { API_BASE_URL } from '../constants/apiConfig';
 import { MessageSquare, Plus, Paperclip, Image as ImageIcon, FileText, Table, Square } from 'lucide-react';
 import './ChatPage.css';
 import '../components/MarkdownViewer.css';
@@ -181,10 +182,10 @@ export default function ChatPage() {
   };
 
   const callChatAPI = async (payload) => {
-    const endpoints = ['/api/chat'];
-    if (typeof window !== 'undefined') {
-      endpoints.push('http://localhost:7861/api/chat');
-    }
+    const endpoints = Array.from(new Set([
+      `${API_BASE_URL}/chat`,
+      '/api/chat'
+    ]));
     for (let i = 0; i < endpoints.length; i++) {
       const url = endpoints[i];
       try {
@@ -219,10 +220,10 @@ export default function ChatPage() {
   };
 
   const streamChatAPI = async (payload, onChunk, signal) => {
-    const endpoints = ['/api/chat/stream'];
-    if (typeof window !== 'undefined') {
-      endpoints.push('http://localhost:7861/api/chat/stream');
-    }
+    const endpoints = Array.from(new Set([
+      `${API_BASE_URL}/chat/stream`,
+      '/api/chat/stream'
+    ]));
     for (let i = 0; i < endpoints.length; i++) {
       const url = endpoints[i];
       try {
@@ -319,10 +320,10 @@ export default function ChatPage() {
       conv_id: convId || null,
       request_id: requestId || null,
     };
-    const endpoints = ['/api/chat/cancel'];
-    if (typeof window !== 'undefined') {
-      endpoints.push('http://localhost:7861/api/chat/cancel');
-    }
+    const endpoints = Array.from(new Set([
+      `${API_BASE_URL}/chat/cancel`,
+      '/api/chat/cancel'
+    ]));
     for (let i = 0; i < endpoints.length; i++) {
       const url = endpoints[i];
       try {

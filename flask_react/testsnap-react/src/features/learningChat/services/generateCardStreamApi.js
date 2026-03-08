@@ -1,3 +1,5 @@
+import { API_BASE_URL, API_ROOT_URL } from '../../../constants/apiConfig';
+
 function readSep(buffer) {
   const nn = buffer.indexOf('\n\n');
   const rr = buffer.indexOf('\r\n\r\n');
@@ -45,11 +47,12 @@ export async function streamGenerateLearningCard({ userId, messages, modelName, 
     model_name: modelName || null
   });
 
-  const endpoints = ['/generate_card/stream', '/api/generate_card/stream'];
-  if (typeof window !== 'undefined') {
-    endpoints.push('http://localhost:7861/generate_card/stream');
-    endpoints.push('http://localhost:7861/api/generate_card/stream');
-  }
+  const endpoints = Array.from(new Set([
+    `${API_ROOT_URL}/generate_card/stream`,
+    `${API_BASE_URL}/generate_card/stream`,
+    '/generate_card/stream',
+    '/api/generate_card/stream'
+  ]));
 
   for (let i = 0; i < endpoints.length; i++) {
     const url = endpoints[i];
@@ -118,4 +121,3 @@ export async function streamGenerateLearningCard({ userId, messages, modelName, 
   }
   return { ok: false, error: '生成学习卡片失败' };
 }
-

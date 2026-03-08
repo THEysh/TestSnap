@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
+from urllib.parse import urlparse, urlunparse
 
 import nest_asyncio
+from dotenv import load_dotenv
 from flask import Flask, jsonify
 from flask_cors import CORS
 
@@ -20,6 +23,8 @@ from srcProject.config.settings import CHAT_API_KEY, CHAT_MODEL_NAME, CHAT_URL
 
 
 def create_app() -> Flask:
+    env_path = Path(__file__).resolve().parents[1] / ".env"
+    load_dotenv(env_path)
     nest_asyncio.apply()
     init_mimetypes()
 
@@ -27,8 +32,19 @@ def create_app() -> Flask:
     CORS(app)
 
     project_root = get_project_root()
-    port = int(os.getenv("TEXTSNAP_PORT", "7861"))
-    api_base_url = os.getenv("TEXTSNAP_API_BASE_URL", f"http://127.0.0.1:{port}/api")
+    port = int(os.getenv("PORT", "7861"))
+    base_url = os.getenv("BASE_URL", "")
+    if base_url:
+        parsed = urlparse(base_url.strip())
+        if not parsed.scheme and not parsed.netloc:
+            parsed = urlparse(f"http://{base_url.strip()}")
+        netloc = parsed.netloc or ""
+        if ":" not in netloc:
+            netloc = f"{netloc}:{port}"
+        base_root = urlunparse((parsed.scheme or "http", netloc, "", "", "", ""))
+        api_base_url = f"{base_root}/api"
+    else:
+        api_base_url = f"http://127.0.0.1:{port}/api"
 
     retention = FileRetention(retention_seconds=10800)
     worker = WorkerManager(api_base_url=api_base_url, on_result_directory=retention.schedule_directory_deletion)

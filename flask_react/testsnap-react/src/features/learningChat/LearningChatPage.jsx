@@ -10,6 +10,7 @@ import { generateLearningCard } from './services/generateCardApi';
 import { streamGenerateLearningCard } from './services/generateCardStreamApi';
 import { buildMessages } from '../../utils/buildChatMessages';
 import { appendToCardLibrary } from './services/cardStorage';
+import { API_BASE_URL } from '../../constants/apiConfig';
 import '../../components/MarkdownViewer.css';
 import './learningChat.css';
 import GenerateCardModal from './components/GenerateCardModal';
@@ -64,8 +65,10 @@ function buildAttachmentsFromContextBlocks(blocks) {
 
 async function cancelChat({ convId, requestId }) {
   const payload = { conv_id: convId || null, request_id: requestId || null };
-  const endpoints = ['/api/chat/cancel'];
-  if (typeof window !== 'undefined') endpoints.push('http://localhost:7861/api/chat/cancel');
+  const endpoints = Array.from(new Set([
+    `${API_BASE_URL}/chat/cancel`,
+    '/api/chat/cancel'
+  ]));
   for (let i = 0; i < endpoints.length; i++) {
     const url = endpoints[i];
     try {

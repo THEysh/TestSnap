@@ -119,9 +119,9 @@ class WorkerManager:
         self._daemon_lock = threading.Lock()
         self._daemon_conn: Any | None = None
         self._daemon_reader: threading.Thread | None = None
-        self._daemon_host = os.getenv("TEXTSNAP_WORKER_HOST", "127.0.0.1")
-        self._daemon_port = int(os.getenv("TEXTSNAP_WORKER_PORT", "7862"))
-        self._daemon_authkey = (os.getenv("TEXTSNAP_WORKER_AUTHKEY", "textsnap") or "textsnap").encode("utf-8")
+        self._daemon_host = os.getenv("HOST", "0.0.0.0")
+        self._daemon_port = int(os.getenv("PORT", "7862"))
+        self._daemon_authkey = (os.getenv("WORKER_AUTHKEY", "textsnap") or "textsnap").encode("utf-8")
 
         self._monitor_started = False
         atexit.register(self.shutdown)

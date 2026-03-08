@@ -887,7 +887,7 @@
   align-items: center;
   justify-content: center;
   padding: 18px 18px;
-  z-index: 50;
+  z-index: 90;
 }
 
 .lcModal {
@@ -1125,5 +1125,11 @@
     bottom: 0;
     z-index: 55;
     backdrop-filter: blur(10px);
+  }
+}
+
+@media (max-width: 520px) {
+  .lcModelPicker {
+    min-width: 0;
   }
 }

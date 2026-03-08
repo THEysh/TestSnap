@@ -25,6 +25,13 @@
   justify-content: space-between;
 }
 
+.appNavTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .appBrand {
   display: inline-flex;
   align-items: center;
@@ -127,6 +134,20 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+.appNavToggle {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 900;
+  border-radius: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.appNavToggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .appMain {
   padding: 22px 18px 60px;
 }
@@ -148,8 +169,14 @@
     flex-direction: column;
     align-items: stretch;
   }
+  .appNavTop {
+    width: 100%;
+  }
+  .appNav.is-collapsed .appNavLinks,
+  .appNav.is-collapsed .appNavRight {
+    display: none;
+  }
   .appNavRight {
     justify-content: space-between;
   }
 }
-

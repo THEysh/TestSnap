@@ -53,6 +53,10 @@ def complete_task(task_id, result=None, error=None):
                 'updated_at': time.time()
             })
             logger.error(f"任务 {task_id} 失败: {error}")
+            try:
+                push_task_stream(task_id, {"type": "error", "content": error})
+            except Exception:
+                pass
         else:
             TASK_PROCESS[task_id].update({
                 'progress': 100,

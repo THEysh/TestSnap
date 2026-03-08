@@ -1,3 +1,5 @@
+import { API_BASE_URL } from '../../../constants/apiConfig';
+
 function readSep(buffer) {
   const nn = buffer.indexOf('\n\n');
   const rr = buffer.indexOf('\r\n\r\n');
@@ -20,8 +22,10 @@ function extractDataLines(evt) {
 }
 
 export async function streamChatAPI(payload, onChunk, signal) {
-  const endpoints = ['/api/chat/stream'];
-  if (typeof window !== 'undefined') endpoints.push('http://localhost:7861/api/chat/stream');
+  const endpoints = Array.from(new Set([
+    `${API_BASE_URL}/chat/stream`,
+    '/api/chat/stream'
+  ]));
   for (let i = 0; i < endpoints.length; i++) {
     const url = endpoints[i];
     try {
@@ -95,4 +99,3 @@ export async function streamChatAPI(payload, onChunk, signal) {
   }
   return { success: false, error: '未知错误' };
 }
-

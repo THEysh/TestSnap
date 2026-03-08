@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import multiprocessing
 import os
+from pathlib import Path
+from urllib.parse import urlparse, urlunparse
 import queue
 import threading
 import time
@@ -9,6 +11,7 @@ import uuid
 from typing import Any
 
 from multiprocessing.connection import Listener
+from dotenv import load_dotenv
 
 
 class WorkerDaemon:
@@ -233,14 +236,26 @@ class WorkerDaemon:
 
 
 def main() -> None:
-    port = int(os.getenv("TEXTSNAP_PORT", "7861"))
-    api_base_url = os.getenv("TEXTSNAP_API_BASE_URL", f"http://127.0.0.1:{port}/api")
-    host = os.getenv("TEXTSNAP_WORKER_HOST", "127.0.0.1")
-    daemon_port = int(os.getenv("TEXTSNAP_WORKER_PORT", "7862"))
-    authkey = (os.getenv("TEXTSNAP_WORKER_AUTHKEY", "textsnap") or "textsnap").encode("utf-8")
+    env_path = Path(__file__).resolve().parents[1] / ".env"
+    load_dotenv(env_path)
+    port = int(os.getenv("PORT", "7861"))
+    base_url = os.getenv("BASE_URL", "")
+    if base_url:
+        parsed = urlparse(base_url.strip())
+        if not parsed.scheme and not parsed.netloc:
+            parsed = urlparse(f"http://{base_url.strip()}")
+        netloc = parsed.netloc or ""
+        if ":" not in netloc:
+            netloc = f"{netloc}:{port}"
+        base_root = urlunparse((parsed.scheme or "http", netloc, "", "", "", ""))
+        api_base_url = f"{base_root}/api"
+    else:
+        api_base_url = f"http://127.0.0.1:{port}/api"
+    host = os.getenv("HOST", "0.0.0.0")
+    daemon_port = int(os.getenv("WORKER_PORT", "7862"))
+    authkey = (os.getenv("WORKER_AUTHKEY", "textsnap") or "textsnap").encode("utf-8")
     WorkerDaemon(api_base_url=api_base_url, host=host, port=daemon_port, authkey=authkey).serve_forever()
 
 
 if __name__ == "__main__":
     main()
-

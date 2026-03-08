@@ -134,7 +134,12 @@ const useFileProcess = ({ persistKey } = {}) => {
           const progressData = await getTaskProgress(taskId);
           
           if (!progressData.success) {
-            throw new Error(progressData.error || '获取进度失败');
+            clearInterval(checkProgress);
+            checkProgress = null;
+            setStatus('error');
+            setError(progressData.error || '获取进度失败');
+            setProgress(0);
+            return;
           }
           
           setProgress(progressData.progress || 0);
@@ -167,7 +172,13 @@ const useFileProcess = ({ persistKey } = {}) => {
             setProgress(0);
           }
         } catch (err) {
-          console.error('轮询进度时出错:', err);
+          if (checkProgress) {
+            clearInterval(checkProgress);
+            checkProgress = null;
+          }
+          setStatus('error');
+          setError(err.message || '获取进度失败');
+          setProgress(0);
         }
       }, 1000);
 
@@ -199,7 +210,11 @@ const useFileProcess = ({ persistKey } = {}) => {
           },
           signal: controller.signal
         });
-        if (!res.ok || !res.body) return;
+        if (!res.ok || !res.body) {
+          setStatus('error');
+          setError(`OCR流式通道异常: ${res.status}`);
+          return;
+        }
         const reader = res.body.getReader();
         const decoder = new TextDecoder('utf-8');
         let buffer = '';
@@ -231,6 +246,11 @@ const useFileProcess = ({ persistKey } = {}) => {
               const payload = JSON.parse(dataStr);
               if (payload?.type === 'append' && payload.content) {
                 setStreamContent(prev => prev + payload.content);
+              } else if (payload?.type === 'error') {
+                setStatus('error');
+                setError(String(payload.content || '处理失败'));
+                setProgress(0);
+                return;
               }
             } catch {
               continue;

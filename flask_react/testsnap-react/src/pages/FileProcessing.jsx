@@ -9,6 +9,7 @@ import { updateImagePaths } from '../utils/markdownUtils';
 import useBlockMarkdownRenderer from '../hooks/useBlockMarkdownRenderer';
 import ChatMarkdown from './ChatMarkdown';
 import { appendToCardLibrary } from '../features/learningChat/services/cardStorage';
+import ImageCropper from './ImageCropper';
 import './fileProcessing.css';
 
 function createId() {
@@ -71,6 +72,8 @@ export default function FileProcessing() {
   const [openCard, setOpenCard] = useState(null);
   const [filePreviewHeight, setFilePreviewHeight] = useState(360);
   const resizeRef = useRef({ dragging: false, startY: 0, startH: 360 });
+  const [cropOpen, setCropOpen] = useState(false);
+  const [cropFile, setCropFile] = useState(null);
 
   useEffect(() => {
     if (!loading && !user) window.location.hash = '#/login';
@@ -259,12 +262,7 @@ export default function FileProcessing() {
 
   const onPick = () => fileInputRef.current?.click();
 
-  const onFileChange = async (e) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    setError('');
-    setSelectedFile(f);
-    setSelectedFileMeta({ name: f.name, type: f.type });
+  const resetWorkspace = () => {
     setMarkdown('');
     setDirty(false);
     setDraftTitle('');
@@ -277,6 +275,26 @@ export default function FileProcessing() {
       if (user?.id) window.localStorage.removeItem(`ts_file_processing_ui_${user.id}`);
     } catch {
       void 0;
+    }
+  };
+
+  const onFileChange = async (e) => {
+    const f = e.target.files?.[0];
+    try {
+      if (e.target) e.target.value = '';
+    } catch {
+      void 0;
+    }
+    if (!f) return;
+    setError('');
+    resetWorkspace();
+    setSelectedFile(f);
+    setSelectedFileMeta({ name: f.name, type: f.type });
+    const isPdf = f.type.includes('pdf') || /\.pdf$/i.test(f.name || '');
+    if (!isPdf) {
+      setCropFile(f);
+      setCropOpen(true);
+      return;
     }
     const res = await upload.handleUpload(f);
     if (!res.success) setError(res.error || '上传失败');
@@ -470,6 +488,28 @@ export default function FileProcessing() {
   return (
     <AppShell title="文件处理">
       <div className="fpLayout">
+        {cropOpen && cropFile && (
+          <ImageCropper
+            file={cropFile}
+            onCancel={() => {
+              setCropOpen(false);
+              setCropFile(null);
+              setSelectedFile(null);
+              setSelectedFileMeta(null);
+              setFileObjectUrl('');
+            }}
+            onConfirm={async (outFile) => {
+              setCropOpen(false);
+              setCropFile(null);
+              resetWorkspace();
+              setError('');
+              setSelectedFile(outFile);
+              setSelectedFileMeta({ name: outFile.name, type: outFile.type });
+              const res = await upload.handleUpload(outFile);
+              if (!res.success) setError(res.error || '上传失败');
+            }}
+          />
+        )}
         <div className="fpCard">
           <div className="fpCardTitle">上传与解析</div>
           <div className="fpHint">{uploadHint}</div>

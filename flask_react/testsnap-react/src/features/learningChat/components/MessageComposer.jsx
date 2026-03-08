@@ -37,22 +37,30 @@ export default function MessageComposer({
       const root = modelWrapRef.current;
       const btn = root?.querySelector?.('button');
       if (!btn || typeof window === 'undefined') return;
+      const vv = window.visualViewport;
+      const viewportHeight = vv?.height || window.innerHeight;
+      const viewportLeft = vv?.offsetLeft || 0;
+      const viewportTop = vv?.offsetTop || 0;
+
       const rect = btn.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceBelow = viewportHeight - rect.bottom;
       const spaceAbove = rect.top;
       const openUp = spaceBelow < 320 && spaceAbove > spaceBelow;
       setModelOpenUp(openUp);
       const maxHeight = Math.max(220, Math.min(520, (openUp ? spaceAbove : spaceBelow) - 16));
-      const next = {
-        left: Math.max(8, rect.left),
-        width: Math.min(rect.width, window.innerWidth - 16),
-        maxHeight
-      };
+
+      const layoutWidth = window.innerWidth;
+      const layoutHeight = window.innerHeight;
+      const width = Math.max(1, Math.round(rect.width));
+      let left = Math.round(rect.left + viewportLeft);
+      left = Math.max(8, Math.min(left, layoutWidth - 8 - width));
+
+      const next = { left, width, maxHeight };
       if (openUp) {
-        next.bottom = Math.max(8, window.innerHeight - rect.top + 8);
+        next.bottom = Math.max(8, layoutHeight - (rect.top + viewportTop) + 8);
         next.top = 'auto';
       } else {
-        next.top = Math.max(8, rect.bottom + 8);
+        next.top = Math.max(8, rect.bottom + viewportTop + 8);
         next.bottom = 'auto';
       }
       setModelMenuStyle(next);
@@ -60,9 +68,14 @@ export default function MessageComposer({
     update();
     window.addEventListener('resize', update);
     window.addEventListener('scroll', update, true);
+    const vv = window.visualViewport;
+    vv?.addEventListener?.('resize', update);
+    vv?.addEventListener?.('scroll', update);
     return () => {
       window.removeEventListener('resize', update);
       window.removeEventListener('scroll', update, true);
+      vv?.removeEventListener?.('resize', update);
+      vv?.removeEventListener?.('scroll', update);
     };
   }, [modelOpen]);
 
