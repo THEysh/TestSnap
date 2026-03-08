@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import '../learningChat.css';
 
 export default function MessageComposer({
@@ -30,6 +31,7 @@ export default function MessageComposer({
   const [modelMenuStyle, setModelMenuStyle] = useState(null);
   const modelWrapRef = useRef(null);
   const modelSearchRef = useRef(null);
+  const modelMenuRef = useRef(null);
 
   useEffect(() => {
     if (!modelOpen) return;
@@ -37,10 +39,7 @@ export default function MessageComposer({
       const root = modelWrapRef.current;
       const btn = root?.querySelector?.('button');
       if (!btn || typeof window === 'undefined') return;
-      const vv = window.visualViewport;
-      const viewportHeight = vv?.height || window.innerHeight;
-      const viewportLeft = vv?.offsetLeft || 0;
-      const viewportTop = vv?.offsetTop || 0;
+      const viewportHeight = window.innerHeight;
 
       const rect = btn.getBoundingClientRect();
       const spaceBelow = viewportHeight - rect.bottom;
@@ -49,18 +48,15 @@ export default function MessageComposer({
       setModelOpenUp(openUp);
       const maxHeight = Math.max(220, Math.min(520, (openUp ? spaceAbove : spaceBelow) - 16));
 
-      const layoutWidth = window.innerWidth;
-      const layoutHeight = window.innerHeight;
       const width = Math.max(1, Math.round(rect.width));
-      let left = Math.round(rect.left + viewportLeft);
-      left = Math.max(8, Math.min(left, layoutWidth - 8 - width));
+      const left = Math.round(rect.left);
 
       const next = { left, width, maxHeight };
       if (openUp) {
-        next.bottom = Math.max(8, layoutHeight - (rect.top + viewportTop) + 8);
+        next.bottom = Math.max(8, viewportHeight - rect.top + 8);
         next.top = 'auto';
       } else {
-        next.top = Math.max(8, rect.bottom + viewportTop + 8);
+        next.top = Math.max(8, rect.bottom + 8);
         next.bottom = 'auto';
       }
       setModelMenuStyle(next);
@@ -68,14 +64,9 @@ export default function MessageComposer({
     update();
     window.addEventListener('resize', update);
     window.addEventListener('scroll', update, true);
-    const vv = window.visualViewport;
-    vv?.addEventListener?.('resize', update);
-    vv?.addEventListener?.('scroll', update);
     return () => {
       window.removeEventListener('resize', update);
       window.removeEventListener('scroll', update, true);
-      vv?.removeEventListener?.('resize', update);
-      vv?.removeEventListener?.('scroll', update);
     };
   }, [modelOpen]);
 
@@ -83,8 +74,9 @@ export default function MessageComposer({
     if (!modelOpen) return;
     const onDown = (e) => {
       const root = modelWrapRef.current;
-      if (!root) return;
-      if (root.contains(e.target)) return;
+      const menu = modelMenuRef.current;
+      if (root && root.contains(e.target)) return;
+      if (menu && menu.contains(e.target)) return;
       setModelOpen(false);
     };
     const onKey = (e) => {
@@ -136,8 +128,9 @@ export default function MessageComposer({
             <span className="lcModelBtnText">{selectedModel || '选择模型'}</span>
             <span className={modelOpen ? 'lcModelCaret is-open' : 'lcModelCaret'} aria-hidden="true" />
           </button>
-          {modelOpen && (
+          {modelOpen && typeof document !== 'undefined' && createPortal(
             <div
+              ref={modelMenuRef}
               className={modelOpenUp ? 'lcModelMenu is-up' : 'lcModelMenu'}
               role="listbox"
               aria-label="模型列表"
@@ -169,7 +162,8 @@ export default function MessageComposer({
                 ))}
                 {filteredModels.length === 0 && <div className="lcModelEmpty">无匹配模型</div>}
               </div>
-            </div>
+            </div>,
+            document.body
           )}
         </div>
 

@@ -1127,9 +1127,3 @@
     backdrop-filter: blur(10px);
   }
 }
-
-@media (max-width: 520px) {
-  .lcModelPicker {
-    min-width: 0;
-  }
-}
