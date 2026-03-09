@@ -17,6 +17,15 @@ function normalizeCard(card) {
   return { id, title, content, meta };
 }
 
+function notifyCardLibraryUpdated(userId) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(new CustomEvent('ts_card_library_updated', { detail: { userId: String(userId || '') } }));
+  } catch {
+    return;
+  }
+}
+
 export function loadCardLibrary(userId) {
   if (typeof window === 'undefined') return [];
   const key = `ts_card_library_${userId}`;
@@ -34,6 +43,7 @@ export function appendToCardLibrary(userId, cards) {
   const incoming = (cards || []).map(normalizeCard).filter(Boolean).filter((c) => !existing.has(String(c.id)));
   const next = incoming.concat(current);
   window.localStorage.setItem(key, JSON.stringify(next));
+  notifyCardLibraryUpdated(userId);
   return { ok: true, count: incoming.length };
 }
 
@@ -42,6 +52,7 @@ export function saveCardLibrary(userId, cards) {
   const key = `ts_card_library_${userId}`;
   const list = (cards || []).map(normalizeCard).filter(Boolean);
   window.localStorage.setItem(key, JSON.stringify(list));
+  notifyCardLibraryUpdated(userId);
   return { ok: true, count: list.length };
 }
 

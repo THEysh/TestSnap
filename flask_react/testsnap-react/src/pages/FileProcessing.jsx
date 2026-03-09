@@ -74,6 +74,13 @@ export default function FileProcessing() {
   const resizeRef = useRef({ dragging: false, startY: 0, startH: 360 });
   const [cropOpen, setCropOpen] = useState(false);
   const [cropFile, setCropFile] = useState(null);
+  const imgViewportRef = useRef(null);
+  const imgNaturalRef = useRef({ w: 0, h: 0 });
+  const imgDragRef = useRef({ dragging: false, pointerId: null, startX: 0, startY: 0, baseX: 0, baseY: 0 });
+  const [imgScale, setImgScale] = useState(1);
+  const [imgOffset, setImgOffset] = useState({ x: 0, y: 0 });
+  const imgScaleRef = useRef(1);
+  const imgOffsetRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     if (!loading && !user) window.location.hash = '#/login';
@@ -259,6 +266,88 @@ export default function FileProcessing() {
     if (!url) return null;
     return { isPdf, url, name };
   }, [selectedFile, selectedFileMeta, fileObjectUrl]);
+
+  useEffect(() => {
+    if (!previewInfo || previewInfo.isPdf) return;
+    setImgScale(1);
+    setImgOffset({ x: 0, y: 0 });
+  }, [previewInfo?.isPdf, previewInfo?.url]);
+
+  useEffect(() => {
+    imgScaleRef.current = imgScale;
+  }, [imgScale]);
+
+  useEffect(() => {
+    imgOffsetRef.current = imgOffset;
+  }, [imgOffset]);
+
+  useEffect(() => {
+    if (!previewInfo || previewInfo.isPdf) return;
+    const el = imgViewportRef.current;
+    if (!el) return;
+
+    const onWheel = (ev) => {
+      ev.preventDefault();
+      const nat = imgNaturalRef.current || {};
+      if (!nat.w || !nat.h) return;
+
+      const rect = el.getBoundingClientRect();
+      const cx = (ev.clientX ?? 0) - rect.left;
+      const cy = (ev.clientY ?? 0) - rect.top;
+      const dir = ev.deltaY < 0 ? 1 : -1;
+      const factor = dir > 0 ? 1.12 : 1 / 1.12;
+      const curScale = imgScaleRef.current;
+      const curOffset = imgOffsetRef.current || { x: 0, y: 0 };
+      const nextScale = Math.max(1, Math.min(4, curScale * factor));
+      if (nextScale === curScale) return;
+
+      const ix = (cx - curOffset.x) / curScale;
+      const iy = (cy - curOffset.y) / curScale;
+      const nextOffset = { x: cx - ix * nextScale, y: cy - iy * nextScale };
+      const clamped = clampImageOffset(nextOffset, nextScale);
+      setImgScale(nextScale);
+      setImgOffset(clamped);
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [previewInfo?.isPdf, previewInfo?.url]);
+
+  const clampImageOffset = (nextOffset, nextScale) => {
+    const el = imgViewportRef.current;
+    const nat = imgNaturalRef.current || {};
+    const nw = Number(nat.w || 0);
+    const nh = Number(nat.h || 0);
+    if (!el || !nw || !nh) return nextOffset;
+    const rect = el.getBoundingClientRect();
+    const vw = rect.width || 0;
+    const vh = rect.height || 0;
+    if (!vw || !vh) return nextOffset;
+    const baseW = vw;
+    const baseH = baseW * (nh / nw);
+    const scaledW = baseW * nextScale;
+    const scaledH = baseH * nextScale;
+
+    const x = Number(nextOffset?.x || 0);
+    const y = Number(nextOffset?.y || 0);
+
+    let minX = vw - scaledW;
+    let maxX = 0;
+    if (scaledW <= vw) {
+      minX = maxX = (vw - scaledW) / 2;
+    }
+
+    let minY = vh - scaledH;
+    let maxY = 0;
+    if (scaledH <= vh) {
+      minY = maxY = (vh - scaledH) / 2;
+    }
+
+    return {
+      x: Math.max(minX, Math.min(maxX, x)),
+      y: Math.max(minY, Math.min(maxY, y)),
+    };
+  };
 
   const onPick = () => fileInputRef.current?.click();
 
@@ -470,7 +559,20 @@ export default function FileProcessing() {
     });
   };
 
-  const saveSelected = () => {
+  const deleteSelected = () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) {
+      setError('请先选择要删除的卡片');
+      return;
+    }
+    setError('');
+    setCards((prev) => prev.filter((c) => !selectedIds.has(c.id)));
+    if (openCard && selectedIds.has(openCard.id)) setOpenCard(null);
+    setSelectedIds(new Set());
+    showToast(`已删除 ${ids.length} 张卡片`);
+  };
+
+  const saveSelectedAndDelete = () => {
     if (!user?.id) return;
     const selected = cards.filter((c) => selectedIds.has(c.id));
     if (selected.length === 0) {
@@ -479,8 +581,48 @@ export default function FileProcessing() {
     }
     setError('');
     const ret = appendToCardLibrary(user.id, selected);
-    if (ret?.ok) showToast(`已保存 ${ret.count || selected.length} 张到卡片库`);
+    if (ret?.ok) showToast(`已保存并删除 ${ret.count || selected.length} 张卡片`);
+    setCards((prev) => prev.filter((c) => !selectedIds.has(c.id)));
+    if (openCard && selectedIds.has(openCard.id)) setOpenCard(null);
     setSelectedIds(new Set());
+  };
+
+  const onImgPointerDown = (e) => {
+    if (!previewInfo || previewInfo.isPdf) return;
+    if (imgScale <= 1.0001) return;
+    const el = imgViewportRef.current;
+    if (!el) return;
+    el.setPointerCapture?.(e.pointerId);
+    imgDragRef.current = {
+      dragging: true,
+      pointerId: e.pointerId,
+      startX: e.clientX ?? 0,
+      startY: e.clientY ?? 0,
+      baseX: imgOffset.x,
+      baseY: imgOffset.y,
+    };
+  };
+
+  const onImgPointerMove = (e) => {
+    const st = imgDragRef.current;
+    if (!st?.dragging) return;
+    if (st.pointerId != null && e.pointerId !== st.pointerId) return;
+    const dx = (e.clientX ?? 0) - st.startX;
+    const dy = (e.clientY ?? 0) - st.startY;
+    const nextOffset = { x: st.baseX + dx, y: st.baseY + dy };
+    setImgOffset(clampImageOffset(nextOffset, imgScale));
+  };
+
+  const onImgPointerUp = (e) => {
+    const st = imgDragRef.current;
+    if (!st?.dragging) return;
+    if (st.pointerId != null && e.pointerId !== st.pointerId) return;
+    imgDragRef.current = { dragging: false, pointerId: null, startX: 0, startY: 0, baseX: 0, baseY: 0 };
+    try {
+      imgViewportRef.current?.releasePointerCapture?.(e.pointerId);
+    } catch {
+      void 0;
+    }
   };
 
   if (loading || !user) return null;
@@ -559,7 +701,30 @@ export default function FileProcessing() {
                 {previewInfo.isPdf ? (
                   <iframe title={previewInfo.name || 'PDF预览'} src={previewInfo.url} />
                 ) : (
-                  <img alt={previewInfo.name || '图片预览'} src={previewInfo.url} />
+                  <div
+                    ref={imgViewportRef}
+                    className={imgScale > 1.0001 ? 'fpImgViewport is-zoomed' : 'fpImgViewport'}
+                    onPointerDown={onImgPointerDown}
+                    onPointerMove={onImgPointerMove}
+                    onPointerUp={onImgPointerUp}
+                    onPointerCancel={onImgPointerUp}
+                  >
+                    <img
+                      alt={previewInfo.name || '图片预览'}
+                      src={previewInfo.url}
+                      draggable={false}
+                      onLoad={(ev) => {
+                        const img = ev?.currentTarget;
+                        if (!img) return;
+                        imgNaturalRef.current = { w: img.naturalWidth || 0, h: img.naturalHeight || 0 };
+                        setImgOffset((prev) => clampImageOffset(prev, imgScale));
+                      }}
+                      style={{
+                        transform: `translate(${Math.round(imgOffset.x)}px, ${Math.round(imgOffset.y)}px) scale(${imgScale})`,
+                        transformOrigin: '0 0',
+                      }}
+                    />
+                  </div>
                 )}
               </div>
               <div
@@ -664,15 +829,6 @@ export default function FileProcessing() {
               rows={6}
             />
           </div>
-          <div className="fpCardActions">
-            <button type="button" className="fpBtn fpBtnGhost" onClick={mergeSelected} disabled={selectedIds.size < 2}>
-              合并选中
-            </button>
-            <button type="button" className="fpBtn fpBtnPrimary" onClick={saveSelected} disabled={selectedIds.size === 0}>
-              保存到卡片库
-            </button>
-          </div>
-
           <div className="fpCardList">
             {cards.map((c) => (
               <div
@@ -706,6 +862,18 @@ export default function FileProcessing() {
             ))}
             {cards.length === 0 && <div className="fpEmpty">暂无卡片。可从 Markdown 选中内容或按标题拆分生成。</div>}
           </div>
+          <div className="fpCardActions">
+            <button type="button" className="fpBtn fpBtnGhost" onClick={mergeSelected} disabled={selectedIds.size < 2}>
+              合并选中
+            </button>
+            <button type="button" className="fpBtn fpBtnGhost" onClick={deleteSelected} disabled={selectedIds.size === 0}>
+              删除选中
+            </button>
+            <button type="button" className="fpBtn fpBtnPrimary" onClick={saveSelectedAndDelete} disabled={selectedIds.size === 0}>
+              保存并删除
+            </button>
+          </div>
+
         </div>
       </div>
       {previewSelection.open && (

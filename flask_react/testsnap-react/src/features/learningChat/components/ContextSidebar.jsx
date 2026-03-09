@@ -10,7 +10,8 @@ export default function ContextSidebar({
   activePersonalityId,
   onSelectPersonality,
   cards,
-  onOpenCard
+  onOpenCard,
+  onDeleteCard
 }) {
   const [personaOpen, setPersonaOpen] = useState(false);
   const [personaQuery, setPersonaQuery] = useState('');
@@ -140,10 +141,23 @@ export default function ContextSidebar({
         <div className="lcPanelTitle">知识卡片</div>
         <div className="lcCardList">
           {cards.map((c) => (
-            <button key={c.id} type="button" className="lcMiniCard" onClick={() => onOpenCard(c)}>
-              <div className="lcMiniCardTitle">{c.title}</div>
-              <div className="lcMiniCardMeta">{c.meta}</div>
-            </button>
+            <div key={c.id} className="lcMiniCardRow">
+              <button type="button" className="lcMiniCard" onClick={() => onOpenCard(c)}>
+                <div className="lcMiniCardTitle">{c.title}</div>
+                <div className="lcMiniCardMeta">{c.meta}</div>
+              </button>
+              <button
+                type="button"
+                className="lcMiniCardDel"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteCard?.(c);
+                }}
+                title="删除"
+              >
+                删除
+              </button>
+            </div>
           ))}
           {cards.length === 0 && (
             <div className="lcEmpty">

@@ -17,6 +17,7 @@ export default function MessageComposer({
   onChangeModel,
   enableReasoning,
   canThink,
+  thinkLocked,
   onToggleReasoning,
   contextBlocks,
   onRemoveContext
@@ -167,11 +168,20 @@ export default function MessageComposer({
           )}
         </div>
 
-        <label className={canThink ? 'lcThinkToggle' : 'lcThinkToggle is-disabled'} title={canThink ? '开启思考会返回更详细的推理过程（更慢）' : '当前模型不支持思考'}>
+        <label
+          className={canThink && !thinkLocked ? 'lcThinkToggle' : 'lcThinkToggle is-disabled'}
+          title={
+            !canThink
+              ? '当前模型不支持思考'
+              : thinkLocked
+                ? '该模型已自动开启思考，无法手动关闭'
+                : '开启思考会返回更详细的推理过程（更慢）'
+          }
+        >
           <input
             type="checkbox"
             checked={!!enableReasoning}
-            disabled={sending || !canThink}
+            disabled={sending || !canThink || !!thinkLocked}
             onChange={(e) => onToggleReasoning?.(e.target.checked)}
           />
           <span className="lcSwitch" aria-hidden="true" />

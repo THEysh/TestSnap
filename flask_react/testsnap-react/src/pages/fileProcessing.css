@@ -153,6 +153,33 @@
   display: block;
 }
 
+.fpImgViewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  touch-action: none;
+  user-select: none;
+  overscroll-behavior: contain;
+}
+
+.fpImgViewport.is-zoomed {
+  cursor: grab;
+}
+
+.fpImgViewport.is-zoomed:active {
+  cursor: grabbing;
+}
+
+.fpImgViewport > img {
+  width: 100%;
+  height: auto;
+  display: block;
+  will-change: transform;
+}
+
 .fpResizeHandle {
   height: 12px;
   border-radius: 999px;

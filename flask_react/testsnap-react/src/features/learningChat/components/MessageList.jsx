@@ -42,8 +42,11 @@ export default function MessageList({ messages, streaming, onGenerateCard }) {
 
   return (
     <div className="lcThread">
-      {messages.map((m) => (
-        <div key={m.id} className={m.role === 'user' ? 'lcMsg lcMsgUser' : 'lcMsg lcMsgAi'}>
+      {messages.map((m, idx) => {
+        const isLast = idx === messages.length - 1;
+        const isTyping = !!streaming && isLast && m.role === 'assistant' && !String(m.content || '').trim();
+        return (
+          <div key={m.id} className={m.role === 'user' ? 'lcMsg lcMsgUser' : 'lcMsg lcMsgAi'}>
           <div className="lcBubble">
             <div className="lcMsgActions">
               <button
@@ -82,14 +85,23 @@ export default function MessageList({ messages, streaming, onGenerateCard }) {
                     <pre className="lcReasoningBody">{String(m.reasoning || '')}</pre>
                   </details>
                 )}
-                <ChatMarkdown content={m.content} />
+                {isTyping ? (
+                  <div className="lcTyping" aria-label="AI正在输入">
+                    <span className="lcTypingDot" />
+                    <span className="lcTypingDot" />
+                    <span className="lcTypingDot" />
+                  </div>
+                ) : (
+                  <ChatMarkdown content={m.content} />
+                )}
               </div>
             ) : (
               <div className="lcPlain">{m.content}</div>
             )}
           </div>
-        </div>
-      ))}
+          </div>
+        );
+      })}
       <div ref={endRef} />
     </div>
   );

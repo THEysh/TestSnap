@@ -9,7 +9,7 @@ import { streamChatAPI } from './services/chatApi';
 import { generateLearningCard } from './services/generateCardApi';
 import { streamGenerateLearningCard } from './services/generateCardStreamApi';
 import { buildMessages } from '../../utils/buildChatMessages';
-import { appendToCardLibrary } from './services/cardStorage';
+import { appendToCardLibrary, loadCardLibrary, removeFromCardLibrary } from './services/cardStorage';
 import { API_BASE_URL } from '../../constants/apiConfig';
 import '../../components/MarkdownViewer.css';
 import './learningChat.css';
@@ -130,8 +130,20 @@ export default function LearningChatPage() {
     "deepseek-ai/DeepSeek-V3.1-Terminus",
     "Pro/deepseek-ai/DeepSeek-V3.1-Terminus"
   ]), []);
-  const canThink = useMemo(() => canThinkModels.includes(selectedModel), [canThinkModels, selectedModel]);
+  const isThinkingModel = useMemo(() => /thinking/i.test(String(selectedModel || '')), [selectedModel]);
+  const canThink = useMemo(() => {
+    if (isThinkingModel) return true;
+    return canThinkModels.includes(selectedModel);
+  }, [canThinkModels, selectedModel, isThinkingModel]);
   const [enableReasoning, setEnableReasoning] = useState(false);
+
+  useEffect(() => {
+    if (!canThink) {
+      setEnableReasoning(false);
+      return;
+    }
+    if (isThinkingModel) setEnableReasoning(true);
+  }, [canThink, isThinkingModel]);
 
   const [tasks, setTasks] = useState([
     { id: 't1', title: '今日任务', desc: '做 1 道数学题' },
@@ -163,6 +175,7 @@ export default function LearningChatPage() {
   );
 
   const [cards, setCards] = useState([]);
+  const [confirmDeleteCard, setConfirmDeleteCard] = useState({ open: false, card: null });
 
   const [contextBlocks, setContextBlocks] = useState([]);
   const [openCard, setOpenCard] = useState(null);
@@ -326,7 +339,6 @@ export default function LearningChatPage() {
       if (Array.isArray(data.contextBlocks)) setContextBlocks(data.contextBlocks);
       if (Array.isArray(data.tasks) && data.tasks.length > 0) setTasks(data.tasks);
       if (typeof data.activeTaskId === 'string') setActiveTaskId(data.activeTaskId);
-      if (Array.isArray(data.cards)) setCards(data.cards);
       if (typeof data.input === 'string') setInput(data.input);
       if (typeof data.selectedModel === 'string' && data.selectedModel) setSelectedModel(data.selectedModel);
       if (typeof data.enableReasoning === 'boolean') setEnableReasoning(data.enableReasoning);
@@ -337,6 +349,33 @@ export default function LearningChatPage() {
       return;
     }
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const load = () => {
+      const list = loadCardLibrary(user.id);
+      setCards(list);
+      const openId = String(openCard?.id || '');
+      if (openId && !list.some((c) => String(c.id) === openId)) setOpenCard(null);
+    };
+    load();
+    const onUpdated = (e) => {
+      const uid = String(e?.detail?.userId || '');
+      if (uid && uid !== String(user.id)) return;
+      load();
+    };
+    const onStorage = (e) => {
+      const key = String(e?.key || '');
+      if (key !== `ts_card_library_${user.id}`) return;
+      load();
+    };
+    window.addEventListener('ts_card_library_updated', onUpdated);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('ts_card_library_updated', onUpdated);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, [user?.id, openCard?.id]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return;
@@ -375,7 +414,6 @@ export default function LearningChatPage() {
           tasks,
           activeTaskId,
           activePersonalityId,
-          cards,
           input
         };
         window.localStorage.setItem(key, JSON.stringify(payload));
@@ -385,7 +423,7 @@ export default function LearningChatPage() {
         persistTimerRef.current = null;
       }
     }, 180);
-  }, [user?.id, messages, contextBlocks, tasks, activeTaskId, activePersonalityId, cards, input, selectedModel, enableReasoning]);
+  }, [user?.id, messages, contextBlocks, tasks, activeTaskId, activePersonalityId, input, selectedModel, enableReasoning]);
 
   useEffect(() => {
     return () => {
@@ -411,7 +449,6 @@ export default function LearningChatPage() {
       const queued = JSON.parse(raw);
       window.localStorage.removeItem(key);
       if (!Array.isArray(queued) || queued.length === 0) return;
-      setCards((prev) => queued.concat(prev));
       setMessages((prev) => prev.concat([{
         id: createId(),
         role: 'assistant',
@@ -478,6 +515,24 @@ export default function LearningChatPage() {
 
   const openCardModal = (card) => {
     setOpenCard(card);
+  };
+
+  const requestDeleteCard = (card) => {
+    if (!card) return;
+    setConfirmDeleteCard({ open: true, card });
+  };
+
+  const confirmDelete = () => {
+    if (!user?.id) return;
+    const card = confirmDeleteCard?.card;
+    const id = String(card?.id || '');
+    if (!id) {
+      setConfirmDeleteCard({ open: false, card: null });
+      return;
+    }
+    removeFromCardLibrary(user.id, id);
+    setConfirmDeleteCard({ open: false, card: null });
+    showToast('已删除卡片');
   };
 
   const stopGenerating = () => {
@@ -671,6 +726,7 @@ export default function LearningChatPage() {
             onSelectPersonality={setActivePersonalityId}
             cards={cards}
             onOpenCard={openCardModal}
+              onDeleteCard={requestDeleteCard}
           />
         )}
 
@@ -696,6 +752,7 @@ export default function LearningChatPage() {
             onChangeModel={setSelectedModel}
             enableReasoning={enableReasoning}
             canThink={canThink}
+            thinkLocked={isThinkingModel}
             onToggleReasoning={setEnableReasoning}
             contextBlocks={contextBlocks}
             onRemoveContext={removeContext}
@@ -723,6 +780,10 @@ export default function LearningChatPage() {
                 cards={cards}
                 onOpenCard={(card) => {
                   openCardModal(card);
+                  setSidebarOpen(false);
+                }}
+                onDeleteCard={(card) => {
+                  requestDeleteCard(card);
                   setSidebarOpen(false);
                 }}
               />
@@ -794,6 +855,22 @@ export default function LearningChatPage() {
                 确认清空
               </button>
               <button type="button" className="lcBtn lcBtnGhost" onClick={() => setConfirmClear(false)}>
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {confirmDeleteCard?.open && (
+        <div className="lcConfirmMask" role="dialog" aria-modal="true">
+          <div className="lcConfirm">
+            <div className="lcConfirmTitle">删除知识卡片</div>
+            <div className="lcConfirmDesc">将从卡片库中删除：{String(confirmDeleteCard?.card?.title || '知识卡片')}</div>
+            <div className="lcConfirmActions">
+              <button type="button" className="lcBtn lcBtnPrimary" onClick={confirmDelete}>
+                确认删除
+              </button>
+              <button type="button" className="lcBtn lcBtnGhost" onClick={() => setConfirmDeleteCard({ open: false, card: null })}>
                 取消
               </button>
             </div>
