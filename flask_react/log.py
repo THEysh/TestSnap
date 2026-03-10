@@ -6,7 +6,7 @@ import queue
 # 存储任务进度的字典，键为任务ID，值包含进度信息
 TASK_PROCESS = {}
 TASK_STREAMS = {}
-_TASK_LOCK = threading.Lock()
+_TASK_LOCK = threading.RLock()
 # 配置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('TextSnapServer')
@@ -20,6 +20,7 @@ def update_task_progress(task_id, progress, status='processing', message=None, r
     :param message: 状态消息
     :param result: 任务结果（任务完成时）
     """
+    log_line = None
     with _TASK_LOCK:
         if task_id in TASK_PROCESS:
             TASK_PROCESS[task_id].update({
@@ -30,7 +31,9 @@ def update_task_progress(task_id, progress, status='processing', message=None, r
             })
             if result:
                 TASK_PROCESS[task_id]['result'] = result
-    logger.info(f"任务 {task_id} 进度更新: {progress}% - {status} - {message or ''}")
+            log_line = f"任务 {task_id} 进度更新: {progress}% - {status} - {message or ''}"
+    if log_line:
+        logger.info(log_line)
 
 
 def complete_task(task_id, result=None, error=None):
@@ -40,6 +43,9 @@ def complete_task(task_id, result=None, error=None):
     :param result: 成功结果
     :param error: 错误信息
     """
+    log_line = None
+    log_level = "info"
+    stream_payload = None
     with _TASK_LOCK:
         if task_id not in TASK_PROCESS:
             logger.warning(f"尝试完成不存在的任务: {task_id}")
@@ -52,11 +58,9 @@ def complete_task(task_id, result=None, error=None):
                 'message': error,
                 'updated_at': time.time()
             })
-            logger.error(f"任务 {task_id} 失败: {error}")
-            try:
-                push_task_stream(task_id, {"type": "error", "content": error})
-            except Exception:
-                pass
+            log_level = "error"
+            log_line = f"任务 {task_id} 失败: {error}"
+            stream_payload = {"type": "error", "content": error}
         else:
             TASK_PROCESS[task_id].update({
                 'progress': 100,
@@ -65,7 +69,18 @@ def complete_task(task_id, result=None, error=None):
                 'result': result,
                 'updated_at': time.time()
             })
-            logger.info(f"任务 {task_id} 成功完成")
+            log_level = "info"
+            log_line = f"任务 {task_id} 成功完成"
+    if log_line:
+        if log_level == "error":
+            logger.error(log_line)
+        else:
+            logger.info(log_line)
+    if stream_payload is not None:
+        try:
+            push_task_stream(task_id, stream_payload)
+        except Exception:
+            pass
 
     # 延迟删除任务信息（给客户端时间获取最终状态）
     def cleanup_task():

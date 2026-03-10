@@ -165,11 +165,11 @@
   overscroll-behavior: contain;
 }
 
-.fpImgViewport.is-zoomed {
+.fpImgViewport {
   cursor: grab;
 }
 
-.fpImgViewport.is-zoomed:active {
+.fpImgViewport:active {
   cursor: grabbing;
 }
 

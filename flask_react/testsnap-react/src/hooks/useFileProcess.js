@@ -11,6 +11,18 @@ function safeJsonParse(value, fallback) {
   }
 }
 
+function normalizeProcessingError(message) {
+  const msg = String(message || '');
+  if (!msg) return '';
+  if (msg.includes('0xC0000005') || msg.includes('处理进程崩溃')) {
+    return '任务进程异常崩溃，请重新再试一次';
+  }
+  if (msg.includes('worker未就绪') || msg.includes('worker连接中断')) {
+    return '处理服务未就绪，请稍后重试（或重启后端服务）';
+  }
+  return msg;
+}
+
 function readPersisted(key) {
   if (typeof window === 'undefined') return null;
   if (!key) return null;
@@ -64,6 +76,7 @@ const useFileProcess = ({ persistKey } = {}) => {
   }, [persistKey]);
 
   const process = async (filename, isPdf) => {
+    setTaskId(null);
     setStatus('processing');
     setProgress(0);
     setProgressMessage('');
@@ -168,7 +181,7 @@ const useFileProcess = ({ persistKey } = {}) => {
             checkProgress = null;
             
             setStatus('error');
-            setError(progressData.message || '处理失败');
+            setError(normalizeProcessingError(progressData.message || '处理失败'));
             setProgress(0);
           }
         } catch (err) {
@@ -176,8 +189,12 @@ const useFileProcess = ({ persistKey } = {}) => {
             clearInterval(checkProgress);
             checkProgress = null;
           }
+          const msg = String(err?.message || '');
+          if (msg.includes('404')) {
+            setTaskId(null);
+          }
           setStatus('error');
-          setError(err.message || '获取进度失败');
+          setError(normalizeProcessingError(msg || '获取进度失败'));
           setProgress(0);
         }
       }, 1000);
@@ -213,6 +230,7 @@ const useFileProcess = ({ persistKey } = {}) => {
         if (!res.ok || !res.body) {
           setStatus('error');
           setError(`OCR流式通道异常: ${res.status}`);
+          if (res.status === 404) setTaskId(null);
           return;
         }
         const reader = res.body.getReader();
@@ -248,8 +266,9 @@ const useFileProcess = ({ persistKey } = {}) => {
                 setStreamContent(prev => prev + payload.content);
               } else if (payload?.type === 'error') {
                 setStatus('error');
-                setError(String(payload.content || '处理失败'));
+                setError(normalizeProcessingError(payload.content || '处理失败'));
                 setProgress(0);
+                setTaskId(null);
                 return;
               }
             } catch {

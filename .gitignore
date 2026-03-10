@@ -3,6 +3,7 @@ srcProject/output/visualizations
 flask_react/testsnap-react/node_modules
 flask_react/testsnap-react/dist
 flask_react/testsnap-react/dist-ssr
+flask_react/project_ppt
 *.local
 configs.yaml
 configs_github.yaml

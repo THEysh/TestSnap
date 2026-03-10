@@ -16,42 +16,12 @@ function createId() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`.replaceAll('.', '');
 }
 
-function splitByHeadings(markdown) {
-  const md = String(markdown || '').trim();
-  if (!md) return [];
-  const lines = md.split(/\r?\n/);
-  const sections = [];
-  let current = { title: '未命名卡片', body: [] };
-  const flush = () => {
-    const body = current.body.join('\n').trim();
-    if (!body) return;
-    sections.push({
-      id: createId(),
-      title: current.title,
-      meta: '从 Markdown 拆分',
-      content: body
-    });
-  };
-  for (const line of lines) {
-    const m = /^(#{1,3})\s+(.+)$/.exec(line.trim());
-    if (m) {
-      flush();
-      current = { title: m[2].trim(), body: [] };
-      continue;
-    }
-    current.body.push(line);
-  }
-  flush();
-  return sections;
-}
-
 export default function FileProcessing() {
   const { user, loading } = useAuth();
   const upload = useFileUpload();
   const proc = useFileProcess({ persistKey: user?.id ? `ts_file_processing_task_${user.id}` : '' });
 
   const fileInputRef = useRef(null);
-  const editorRef = useRef(null);
   const toastTimerRef = useRef(null);
   const uiPersistTimerRef = useRef(null);
   const uiLoadedRef = useRef(false);
@@ -298,7 +268,7 @@ export default function FileProcessing() {
       const factor = dir > 0 ? 1.12 : 1 / 1.12;
       const curScale = imgScaleRef.current;
       const curOffset = imgOffsetRef.current || { x: 0, y: 0 };
-      const nextScale = Math.max(1, Math.min(4, curScale * factor));
+      const nextScale = Math.max(0.2, Math.min(6, curScale * factor));
       if (nextScale === curScale) return;
 
       const ix = (cx - curOffset.x) / curScale;
@@ -331,17 +301,11 @@ export default function FileProcessing() {
     const x = Number(nextOffset?.x || 0);
     const y = Number(nextOffset?.y || 0);
 
-    let minX = vw - scaledW;
-    let maxX = 0;
-    if (scaledW <= vw) {
-      minX = maxX = (vw - scaledW) / 2;
-    }
-
-    let minY = vh - scaledH;
-    let maxY = 0;
-    if (scaledH <= vh) {
-      minY = maxY = (vh - scaledH) / 2;
-    }
+    const margin = 24;
+    const minX = -scaledW + margin;
+    const maxX = vw - margin;
+    const minY = -scaledH + margin;
+    const maxY = vh - margin;
 
     return {
       x: Math.max(minX, Math.min(maxX, x)),
@@ -396,6 +360,12 @@ export default function FileProcessing() {
     const ok = await proc.process(upload.uploadedFileInfo.unique_filename, isPdf);
     if (!ok?.success && proc.error) setError(proc.error);
   };
+
+  useEffect(() => {
+    if (proc.status !== 'error') return;
+    if (!proc.error) return;
+    setError(proc.error);
+  }, [proc.status, proc.error]);
 
   useEffect(() => {
     if (proc.status !== 'completed') return;
@@ -506,38 +476,6 @@ export default function FileProcessing() {
     });
   };
 
-  const buildCardFromSelection = () => {
-    const el = editorRef.current;
-    if (!el) return;
-    const start = el.selectionStart ?? 0;
-    const end = el.selectionEnd ?? 0;
-    const selected = String(markdown || '').slice(start, end).trim();
-    if (!selected) {
-      setError('请先在 Markdown 编辑框中选中内容');
-      return;
-    }
-    setError('');
-    const title = selected.split(/\r?\n/).find((l) => l.trim())?.slice(0, 22) || '知识卡片';
-    const card = { id: createId(), title, meta: '从选中内容生成', content: selected };
-    setCards((prev) => [card].concat(prev));
-    setSelectedIds((prev) => new Set(prev).add(card.id));
-  };
-
-  const buildCardsBySplit = () => {
-    const list = splitByHeadings(markdown);
-    if (list.length === 0) {
-      setError('未检测到可拆分的标题（建议使用 # / ## / ###）');
-      return;
-    }
-    setError('');
-    setCards((prev) => list.concat(prev));
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      list.forEach((c) => next.add(c.id));
-      return next;
-    });
-  };
-
   const mergeSelected = () => {
     const ids = Array.from(selectedIds);
     if (ids.length < 2) {
@@ -589,7 +527,6 @@ export default function FileProcessing() {
 
   const onImgPointerDown = (e) => {
     if (!previewInfo || previewInfo.isPdf) return;
-    if (imgScale <= 1.0001) return;
     const el = imgViewportRef.current;
     if (!el) return;
     el.setPointerCapture?.(e.pointerId);
@@ -703,7 +640,7 @@ export default function FileProcessing() {
                 ) : (
                   <div
                     ref={imgViewportRef}
-                    className={imgScale > 1.0001 ? 'fpImgViewport is-zoomed' : 'fpImgViewport'}
+                    className="fpImgViewport"
                     onPointerDown={onImgPointerDown}
                     onPointerMove={onImgPointerMove}
                     onPointerUp={onImgPointerUp}
@@ -745,7 +682,6 @@ export default function FileProcessing() {
           <div className="fpCard fpEditor">
             <div className="fpCardTitle">Markdown（可编辑）</div>
             <textarea
-              ref={editorRef}
               className="fpTextarea"
               value={markdown}
               onChange={(e) => {
@@ -755,14 +691,6 @@ export default function FileProcessing() {
               placeholder="解析后的 Markdown 将显示在这里…"
               rows={16}
             />
-            <div className="fpEditorActions">
-              <button type="button" className="fpBtn fpBtnGhost" onClick={buildCardFromSelection} disabled={!markdown}>
-                从选中内容生成卡片
-              </button>
-              <button type="button" className="fpBtn fpBtnGhost" onClick={buildCardsBySplit} disabled={!markdown}>
-                按标题拆分生成卡片
-              </button>
-            </div>
           </div>
 
           <div className="fpCard fpPreview">
