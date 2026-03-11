@@ -519,22 +519,42 @@ export default function ChatPage() {
     streamAbortRef.current = controller;
     streamingConvIdRef.current = convId;
     streamingRequestIdRef.current = requestId;
+    let streamTimedOut = false;
+    let streamHadPayload = false;
+    let lastStreamAt = Date.now();
+    const watchdog = window.setInterval(() => {
+      if (!streamAbortRef.current) return;
+      if (Date.now() - lastStreamAt < 30000) return;
+      streamTimedOut = true;
+      try {
+        streamAbortRef.current?.abort();
+      } catch {
+        void 0;
+      }
+      cancelChat({ convId, requestId });
+    }, 1000);
     streamChatAPI(payload, (piece) => {
+      lastStreamAt = Date.now();
       if (typeof piece === 'string') {
+        if (piece.trim()) streamHadPayload = true;
         updateLastAssistantMessage(convId, piece);
       } else if (piece && typeof piece === 'object') {
         if (piece.type === 'reasoning') {
+          if (String(piece.content || '').trim()) streamHadPayload = true;
           updateLastAssistantReasoning(convId, piece.content || '');
         } else if (piece.type === 'content') {
+          if (String(piece.content || '').trim()) streamHadPayload = true;
           updateLastAssistantMessage(convId, piece.content || '');
         } else if (piece.type === 'error') {
+          if (String(piece.content || '').trim()) streamHadPayload = true;
           updateLastAssistantMessage(convId, `\n\n[错误] ${piece.content || ''}`);
         }
       }
       setConvs(getConversations());
     }, controller.signal).then((ret) => {
-      if (!ret.success) {
-        if ((ret.error || '').includes('AbortError')) return null;
+      const shouldFallback = !ret.success || streamTimedOut || (ret.success && !streamHadPayload);
+      if (shouldFallback) {
+        if (!streamTimedOut && (ret.error || '').includes('AbortError')) return null;
         return callChatAPI(payload).then(data => {
           const reply = data && data.success ? (data.reply || '') : (data && data.error ? `调用失败：${data.error}` : '调用失败');
           updateLastAssistantMessage(convId, reply);
@@ -546,10 +566,11 @@ export default function ChatPage() {
     }).catch(err => {
       const name = err?.name || '';
       const msg = String(err || '');
-      if (name === 'AbortError' || msg.includes('AbortError')) return;
+      if (!streamTimedOut && (name === 'AbortError' || msg.includes('AbortError'))) return;
       updateLastAssistantMessage(convId, `\n\n[流式失败] ${msg}`);
       setConvs(getConversations());
     }).finally(() => {
+      window.clearInterval(watchdog);
       setSending(false);
       setAttachments([]);
       streamingConvIdRef.current = null;

@@ -806,27 +806,20 @@ class ChatService:
 
         self._cancel_lock = threading.Lock()
         self._cancel_request_ids: set[str] = set()
-        self._cancel_conv_ids: set[str] = set()
 
     def mark_cancel(self, conv_id: str | None, request_id: str | None) -> None:
         with self._cancel_lock:
             if request_id:
                 self._cancel_request_ids.add(str(request_id))
-            if conv_id:
-                self._cancel_conv_ids.add(str(conv_id))
 
     def clear_cancel(self, conv_id: str | None, request_id: str | None) -> None:
         with self._cancel_lock:
             if request_id:
                 self._cancel_request_ids.discard(str(request_id))
-            if conv_id:
-                self._cancel_conv_ids.discard(str(conv_id))
 
     def is_cancelled(self, conv_id: str | None, request_id: str | None) -> bool:
         with self._cancel_lock:
             if request_id and str(request_id) in self._cancel_request_ids:
-                return True
-            if conv_id and str(conv_id) in self._cancel_conv_ids:
                 return True
             return False
 

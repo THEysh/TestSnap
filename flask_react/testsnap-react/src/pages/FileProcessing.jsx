@@ -51,6 +51,9 @@ export default function FileProcessing() {
   const [imgOffset, setImgOffset] = useState({ x: 0, y: 0 });
   const imgScaleRef = useRef(1);
   const imgOffsetRef = useRef({ x: 0, y: 0 });
+  const editorRef = useRef(null);
+  const [editorHeight, setEditorHeight] = useState(0);
+  const editorHeightRef = useRef(0);
 
   useEffect(() => {
     if (!loading && !user) window.location.hash = '#/login';
@@ -200,6 +203,39 @@ export default function FileProcessing() {
       if (ok) showToast('已追加到卡片草稿');
     }
   });
+
+  useEffect(() => {
+    const target = previewRef.current;
+    if (!target) return;
+
+    let raf = 0;
+    const measure = () => {
+      if (!previewRef.current) return;
+      const h = Math.round(previewRef.current.getBoundingClientRect().height || 0);
+      if (h > 0 && Math.abs(h - (editorHeightRef.current || 0)) > 1) {
+        editorHeightRef.current = h;
+        setEditorHeight(h);
+      }
+    };
+
+    const schedule = () => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(measure);
+    };
+
+    schedule();
+    let ro = null;
+    if (typeof window !== 'undefined' && window.ResizeObserver) {
+      ro = new ResizeObserver(() => schedule());
+      ro.observe(target);
+    }
+    window.addEventListener('resize', schedule);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener('resize', schedule);
+      if (ro) ro.disconnect();
+    };
+  }, [previewRef]);
 
   useEffect(() => {
     renderMarkdown(markdown || '');
@@ -682,6 +718,7 @@ export default function FileProcessing() {
           <div className="fpCard fpEditor">
             <div className="fpCardTitle">Markdown（可编辑）</div>
             <textarea
+              ref={editorRef}
               className="fpTextarea"
               value={markdown}
               onChange={(e) => {
@@ -690,6 +727,7 @@ export default function FileProcessing() {
               }}
               placeholder="解析后的 Markdown 将显示在这里…"
               rows={16}
+              style={editorHeight ? { height: `${editorHeight}px` } : undefined}
             />
           </div>
 
@@ -697,7 +735,9 @@ export default function FileProcessing() {
             <div className="fpCardTitle">预览</div>
             <div
               className="fpPreviewBody"
-              ref={previewRef}
+              ref={(node) => {
+                previewRef.current = node;
+              }}
               onMouseUp={() => {
                 showPreviewSelectionBar();
               }}

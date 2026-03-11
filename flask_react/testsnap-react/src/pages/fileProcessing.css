@@ -208,7 +208,7 @@
   color: rgba(255, 255, 255, 0.92);
   padding: 12px 12px;
   outline: none;
-  resize: vertical;
+  resize: none;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   line-height: 1.55;
 }

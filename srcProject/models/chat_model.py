@@ -121,11 +121,13 @@ class SiliconChatModel(BaseModel):
             if url.startswith("data:"):
                 return url
             u = urlparse(url)
-            if u.scheme in ("http", "https") and u.path.startswith("/api/files/") and u.hostname in (
-            "localhost", "127.0.0.1"):
+            if u.scheme in ("http", "https") and u.path.startswith("/api/files/"):
                 rel = u.path[len("/api/files/"):]
                 base = find_project_root()
-                full = os.path.join(base, rel)
+                base_abs = os.path.abspath(base)
+                full = os.path.abspath(os.path.join(base_abs, rel))
+                if os.path.commonpath([base_abs, full]) != base_abs:
+                    return url
                 if os.path.exists(full) and os.path.isfile(full):
                     with open(full, "rb") as f:
                         data = f.read()
@@ -185,11 +187,7 @@ class SiliconChatModel(BaseModel):
         except Exception as e:
             error_msg = f"API调用错误: {str(e)}, 检查网络连接"
             print(error_msg)
-            # 可以选择是否将错误传递给调用方
-            if enable_reasoning:
-                yield {"type": "error", "content": error_msg}
-            else:
-                yield f"[错误: {error_msg}]"
+            yield {"type": "error", "content": error_msg}
 
 
 # 这个是后端的接口示例：
